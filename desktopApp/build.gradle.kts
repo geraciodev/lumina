@@ -77,6 +77,7 @@ tasks.register<Tar>("packageTarGz") {
     group = "distribution"
     description = "Crea un paquete .tar.gz de la aplicación"
     dependsOn("createDistributable")
+    mustRunAfter("packageAppImage", "packageDeb")
     
     val inputDir = layout.buildDirectory.dir("compose/binaries/main/app")
     from(inputDir)
