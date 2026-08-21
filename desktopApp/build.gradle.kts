@@ -85,14 +85,25 @@ tasks.register<Tar>("packageTarGz") {
     destinationDirectory.set(layout.buildDirectory.dir("distributions"))
 }
 
-tasks.register("generateVersionProperties") {
-    val resourcesDir = File(project.projectDir, "src/main/resources")
-    val outputFile = File(resourcesDir, "version.properties")
-    
-    doLast {
-        if (!resourcesDir.exists()) resourcesDir.mkdirs()
-        outputFile.writeText("version=$appVersion")
+abstract class GenerateVersionPropertiesTask : DefaultTask() {
+    @get:Input
+    abstract val versionString: Property<String>
+
+    @get:OutputFile
+    abstract val outputFile: RegularFileProperty
+
+    @TaskAction
+    fun generate() {
+        val file = outputFile.get().asFile
+        file.parentFile.mkdirs()
+        file.writeText("version=${versionString.get()}")
     }
+}
+
+val currentAppVersion = appVersion
+tasks.register<GenerateVersionPropertiesTask>("generateVersionProperties") {
+    versionString.set(currentAppVersion)
+    outputFile.set(layout.projectDirectory.file("src/main/resources/version.properties"))
 }
 
 tasks.named("processResources") {
