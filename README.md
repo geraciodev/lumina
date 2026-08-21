@@ -37,6 +37,9 @@ El proyecto está configurado para generar instaladores nativos en múltiples pl
 - **Linux**: `.deb`, `.AppImage` y `.tar.gz` (`./gradlew :desktopApp:packageDeb`)
 - **macOS**: `.dmg` (`./gradlew :desktopApp:packageDmg`)
 
+> [!WARNING]
+> Es necesario tener instalado VLC
+
 ## 🛠️ Tecnologías
 
 - **Kotlin** & **Compose Multiplatform** para la UI.
