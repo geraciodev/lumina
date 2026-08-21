@@ -62,7 +62,10 @@ compose.desktop {
                 menu = true
                 upgradeUuid = "6f5f9e20-7b2c-4e9b-9a8c-8f9d8a7b6c5d"
                 dirChooser = true
+                // Dejar console = true durante debugging para ver errores de JVM
                 console = false
+                // Asegura que el instalador incluya la JVM completa
+                includeAllModules = true
             }
             macOS {
                 bundleID = "com.geraciodev.lumina"
