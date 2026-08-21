@@ -36,6 +36,9 @@ compose.desktop {
         mainClass = "com.geraciodev.lumina.MainKt"
 
         nativeDistributions {
+            // Recursos adicionales que se copian junto al ejecutable en la distribución nativa.
+            // En runtime, accesibles via System.getProperty("compose.application.resources.dir")
+            appResourcesRootDir.set(project.layout.projectDirectory.dir("src/main/appResources"))
             targetFormats(
                 TargetFormat.Dmg,
                 TargetFormat.Msi,
