@@ -1,0 +1,248 @@
+package com.geraciodev.lumina.player
+
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.toComposeImageBitmap
+import uk.co.caprica.vlcj.factory.MediaPlayerFactory
+import uk.co.caprica.vlcj.factory.discovery.NativeDiscovery
+import uk.co.caprica.vlcj.media.MediaSlaveType
+import uk.co.caprica.vlcj.player.base.MediaPlayer
+import uk.co.caprica.vlcj.player.base.MediaPlayerEventAdapter
+import uk.co.caprica.vlcj.player.base.TrackDescription
+import uk.co.caprica.vlcj.player.embedded.EmbeddedMediaPlayer
+import uk.co.caprica.vlcj.player.embedded.videosurface.CallbackVideoSurface
+import uk.co.caprica.vlcj.player.embedded.videosurface.VideoSurfaceAdapters
+import uk.co.caprica.vlcj.player.embedded.videosurface.callback.BufferFormat
+import uk.co.caprica.vlcj.player.embedded.videosurface.callback.BufferFormatCallback
+import uk.co.caprica.vlcj.player.embedded.videosurface.callback.RenderCallback
+import uk.co.caprica.vlcj.player.embedded.videosurface.callback.format.RV32BufferFormat
+import java.awt.image.BufferedImage
+import java.awt.image.DataBufferInt
+import java.io.File
+import java.nio.ByteBuffer
+
+object VideoManager {
+    private var factory: MediaPlayerFactory? = null
+    var mediaPlayer: EmbeddedMediaPlayer? = null
+        private set
+
+    var videoFrame by mutableStateOf<ImageBitmap?>(null)
+        private set
+
+    // Playback States
+    var isPlaying by mutableStateOf(false)
+        private set
+    var currentPosition by mutableStateOf(0f) // 0.0 to 1.0
+        private set
+    var currentTime by mutableStateOf(0L) // milliseconds
+        private set
+    var duration by mutableStateOf(0L) // milliseconds
+        private set
+    var currentVolume by mutableStateOf(100)
+        private set
+
+    var onVideoFinished: (() -> Unit)? = null
+
+    // Track States
+    var audioTracks by mutableStateOf<List<TrackDescription>>(emptyList())
+        private set
+    var subtitleTracks by mutableStateOf<List<TrackDescription>>(emptyList())
+        private set
+    var currentAudioTrack by mutableStateOf(-1)
+        private set
+    var currentSubtitleTrack by mutableStateOf(-1)
+        private set
+
+    private var bufferImage: BufferedImage? = null
+
+    init {
+        NativeDiscovery().discover()
+        
+        // Argumentos optimizados para estabilidad y compatibilidad
+        val factoryArgs = listOf(
+            "--no-video-title-show",
+            "--avcodec-hw=none",      // Crucial para CallbackVideoSurface
+            "--no-stats",
+            "--quiet",
+            "--verbose=-1",
+            "--no-snapshot-preview",
+            "--clock-jitter=0",
+            "--clock-synchro=0",
+            "--no-skip-frames"
+        )
+        
+        factory = MediaPlayerFactory(factoryArgs)
+        mediaPlayer = factory?.mediaPlayers()?.newEmbeddedMediaPlayer()
+
+        mediaPlayer?.events()?.addMediaPlayerEventListener(object : MediaPlayerEventAdapter() {
+            override fun playing(mediaPlayer: MediaPlayer?) {
+                isPlaying = true
+                duration = mediaPlayer?.status()?.length() ?: 0L
+                updateTracks()
+            }
+
+            override fun audioDeviceChanged(mediaPlayer: MediaPlayer?, audioDevice: String?) {
+                updateTracks()
+            }
+
+            override fun paused(mediaPlayer: MediaPlayer?) {
+                isPlaying = false
+            }
+
+            override fun stopped(mediaPlayer: MediaPlayer?) {
+                isPlaying = false
+                currentPosition = 0f
+                currentTime = 0L
+                clearTracks()
+            }
+
+            override fun positionChanged(mediaPlayer: MediaPlayer?, newPosition: Float) {
+                currentPosition = newPosition
+                currentTime = mediaPlayer?.status()?.time() ?: 0L
+            }
+
+            override fun lengthChanged(mediaPlayer: MediaPlayer?, newLength: Long) {
+                duration = newLength
+            }
+
+            override fun finished(mediaPlayer: MediaPlayer?) {
+                isPlaying = false
+                onVideoFinished?.invoke()
+            }
+
+            override fun volumeChanged(mediaPlayer: MediaPlayer?, volume: Float) {
+                this@VideoManager.currentVolume = (volume * 100).toInt()
+            }
+        })
+
+        val renderCallback = object : RenderCallback {
+            override fun display(
+                mediaPlayer: MediaPlayer,
+                nativeBuffers: Array<out ByteBuffer>,
+                bufferFormat: BufferFormat
+            ) {
+                val buffer = nativeBuffers[0]
+                val width = bufferFormat.getWidth()
+                val height = bufferFormat.getHeight()
+
+                if (bufferImage == null || bufferImage!!.width != width || bufferImage!!.height != height) {
+                    bufferImage = BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB)
+                }
+
+                val pixels = (bufferImage!!.raster.dataBuffer as DataBufferInt).data
+                buffer.asIntBuffer().get(pixels)
+
+                videoFrame = bufferImage!!.toComposeImageBitmap()
+            }
+        }
+
+        val bufferFormatCallback = object : BufferFormatCallback {
+            override fun getBufferFormat(sourceWidth: Int, sourceHeight: Int): BufferFormat {
+                return RV32BufferFormat(sourceWidth, sourceHeight)
+            }
+
+            override fun allocatedBuffers(buffers: Array<out ByteBuffer>) {
+            }
+        }
+
+        mediaPlayer?.videoSurface()?.set(
+            CallbackVideoSurface(
+                bufferFormatCallback,
+                renderCallback,
+                true,
+                VideoSurfaceAdapters.getVideoSurfaceAdapter()
+            )
+        )
+    }
+
+    fun play(file: File, isAudioOnly: Boolean = false) {
+        if (isAudioOnly) {
+            mediaPlayer?.media()?.play(file.absolutePath, ":no-video")
+        } else {
+            mediaPlayer?.media()?.play(file.absolutePath)
+        }
+    }
+
+    fun togglePlayPause() {
+        if (mediaPlayer?.status()?.isPlaying == true) {
+            mediaPlayer?.controls()?.pause()
+        } else {
+            mediaPlayer?.controls()?.play()
+        }
+    }
+
+    fun seekTo(position: Float) {
+        mediaPlayer?.controls()?.setPosition(position)
+    }
+
+    fun skip(millis: Long) {
+        mediaPlayer?.controls()?.skipTime(millis)
+    }
+
+    fun updateVolume(value: Int) {
+        currentVolume = value.coerceIn(0, 100)
+        mediaPlayer?.audio()?.setVolume(currentVolume)
+    }
+
+    fun stop() {
+        mediaPlayer?.controls()?.stop()
+        videoFrame = null
+    }
+
+    fun toggleMute(isMuted: Boolean) {
+        mediaPlayer?.audio()?.setMute(isMuted)
+    }
+
+    // Gestión de Pistas de Audio y Subtítulos
+    fun updateTracks() {
+        audioTracks = mediaPlayer?.audio()?.trackDescriptions() ?: emptyList()
+        subtitleTracks = mediaPlayer?.subpictures()?.trackDescriptions() ?: emptyList()
+        currentAudioTrack = mediaPlayer?.audio()?.track() ?: -1
+        currentSubtitleTrack = mediaPlayer?.subpictures()?.track() ?: -1
+    }
+
+    private fun clearTracks() {
+        audioTracks = emptyList()
+        subtitleTracks = emptyList()
+        currentAudioTrack = -1
+        currentSubtitleTrack = -1
+    }
+
+    fun setAudioTrack(id: Int) {
+        mediaPlayer?.audio()?.setTrack(id)
+        currentAudioTrack = id
+    }
+
+    fun setSubtitleTrack(id: Int) {
+        mediaPlayer?.subpictures()?.setTrack(id)
+        currentSubtitleTrack = id
+    }
+
+    fun cycleAudioTrack() {
+        val tracks = audioTracks
+        if (tracks.size > 1) {
+            val currentIndex = tracks.indexOfFirst { it.id() == currentAudioTrack }
+            val nextIndex = (currentIndex + 1) % tracks.size
+            setAudioTrack(tracks[nextIndex].id())
+        }
+    }
+
+    fun cycleSubtitleTrack() {
+        val tracks = subtitleTracks
+        if (tracks.size > 1) {
+            val currentIndex = tracks.indexOfFirst { it.id() == currentSubtitleTrack }
+            val nextIndex = (currentIndex + 1) % tracks.size
+            setSubtitleTrack(tracks[nextIndex].id())
+        }
+    }
+
+    /**
+     * Carga un archivo de subtítulos externo (.srt, .ass, etc.)
+     */
+    fun loadExternalSubtitle(file: File) {
+        mediaPlayer?.media()?.addSlave(MediaSlaveType.SUBTITLE, file.absolutePath, true)
+        updateTracks()
+    }
+}

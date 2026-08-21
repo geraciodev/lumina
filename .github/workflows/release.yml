@@ -1,0 +1,63 @@
+name: Release Lumina
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'gradle'
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+        shell: bash
+
+      - name: Build Distributions
+        run: |
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            ./gradlew :desktopApp:packageMsi :desktopApp:packageExe
+          elif [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
+            ./gradlew :desktopApp:packageDeb :desktopApp:packageAppImage :desktopApp:packageTarGz
+          elif [ "${{ matrix.os }}" = "macos-latest" ]; then
+            ./gradlew :desktopApp:packageDmg
+          fi
+        shell: bash
+
+      - name: Prepare Artifacts
+        run: |
+          mkdir -p release-artifacts
+          # Buscar y copiar instaladores nativos de forma recursiva
+          find desktopApp/build/compose/binaries/main -type f \( -name "*.msi" -o -name "*.exe" -o -name "*.deb" -o -name "*.AppImage" -o -name "*.dmg" \) -exec cp {} release-artifacts/ \; || true
+          # Buscar y copiar paquetes comprimidos .tar.gz
+          find desktopApp/build/distributions -type f -name "*.tar.gz" -exec cp {} release-artifacts/ \; || true
+        shell: bash
+
+      - name: Upload Release Assets
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+        with:
+          files: release-artifacts/*
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
