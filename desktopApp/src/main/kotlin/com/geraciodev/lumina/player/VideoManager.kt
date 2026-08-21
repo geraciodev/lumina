@@ -59,20 +59,27 @@ object VideoManager {
 
     init {
         NativeDiscovery().discover()
-        
-        // Argumentos optimizados para estabilidad y compatibilidad
+
+        // Seleccionar el backend de audio según el sistema operativo.
+        // En builds empaquetadas, VLC no siempre auto-detecta el aout correctamente.
+        val os = System.getProperty("os.name", "").lowercase()
+        val aoutArg = when {
+            os.contains("win")   -> "--aout=directsound"
+            os.contains("mac")   -> "--aout=auhal"
+            else                 -> "--aout=pulse"   // Linux / otros UNIX
+        }
+
         val factoryArgs = listOf(
             "--no-video-title-show",
             "--avcodec-hw=none",      // Crucial para CallbackVideoSurface
             "--no-stats",
-            "--quiet",
-            "--verbose=-1",
             "--no-snapshot-preview",
             "--clock-jitter=0",
             "--clock-synchro=0",
-            "--no-skip-frames"
+            "--no-skip-frames",
+            aoutArg
         )
-        
+
         factory = MediaPlayerFactory(factoryArgs)
         mediaPlayer = factory?.mediaPlayers()?.newEmbeddedMediaPlayer()
 
@@ -80,6 +87,8 @@ object VideoManager {
             override fun playing(mediaPlayer: MediaPlayer?) {
                 isPlaying = true
                 duration = mediaPlayer?.status()?.length() ?: 0L
+                // Asegura que el volumen se aplique al inicio de la reproducción
+                mediaPlayer?.audio()?.setVolume(currentVolume)
                 updateTracks()
             }
 
