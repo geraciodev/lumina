@@ -12,6 +12,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.geraciodev.lumina.data.model.Playlist
@@ -21,9 +23,18 @@ import javax.swing.JFileChooser
 
 @Composable
 fun PlaylistScreen(viewModel: MainViewModel) {
+    val focusManager = LocalFocusManager.current
     var showCreateDialog by remember { mutableStateOf(false) }
+    var playlistSearchQuery by remember { mutableStateOf("") }
 
-    Row(modifier = Modifier.fillMaxSize()) {
+    Row(
+        modifier = Modifier
+            .fillMaxSize()
+            .clickable {
+                focusManager.clearFocus()
+                viewModel.isSearchInputFocused = false
+            }
+    ) {
         // Lista de Playlists (Sidebar de Playlists)
         Column(
             modifier = Modifier
@@ -117,8 +128,35 @@ fun PlaylistScreen(viewModel: MainViewModel) {
 
                 Spacer(Modifier.height(24.dp))
 
+                TextField(
+                    value = playlistSearchQuery,
+                    onValueChange = { playlistSearchQuery = it },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .onFocusChanged { viewModel.isSearchInputFocused = it.isFocused },
+                    placeholder = { Text("Buscar en la playlist...") },
+                    singleLine = true,
+                    leadingIcon = {
+                        Icon(Icons.Default.Search, contentDescription = "Buscar")
+                    },
+                    colors = TextFieldDefaults.colors(
+                        focusedIndicatorColor = MaterialTheme.colorScheme.primary,
+                        unfocusedIndicatorColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.5f),
+                        focusedContainerColor = Color.Transparent,
+                        unfocusedContainerColor = Color.Transparent
+                    )
+                )
+
+                Spacer(Modifier.height(16.dp))
+
+                val filteredItems = selected.items.filter { item ->
+                    playlistSearchQuery.isBlank() ||
+                        item.fileName.contains(playlistSearchQuery, ignoreCase = true) ||
+                        item.filePath.contains(playlistSearchQuery, ignoreCase = true)
+                }
+
                 LazyColumn(modifier = Modifier.fillMaxSize()) {
-                    items(selected.items) { item ->
+                    items(filteredItems) { item ->
                         ListItem(
                             headlineContent = { Text(item.fileName) },
                             supportingContent = { Text(item.filePath, style = MaterialTheme.typography.labelSmall) },

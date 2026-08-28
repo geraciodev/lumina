@@ -104,6 +104,10 @@ fun VideoControls(viewModel: MainViewModel, modifier: Modifier = Modifier) {
                         )
                     }
 
+                    IconButton(onClick = { viewModel.stopVideo() }) {
+                        Icon(Icons.Filled.Stop, "Detener", tint = Color.White)
+                    }
+
                     IconButton(onClick = { viewModel.playNext() }) {
                         Icon(Icons.Filled.SkipNext, "Siguiente", tint = Color.White)
                     }

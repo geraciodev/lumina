@@ -37,6 +37,7 @@ class MainViewModel(
     var searchQuery by mutableStateOf("")
     var searchResults by mutableStateOf(emptyList<File>())
     var isSearching by mutableStateOf(false)
+    var isSearchInputFocused by mutableStateOf(false)
     var selectedVideo by mutableStateOf<File?>(null)
     var isAudioOnly by mutableStateOf(false)
     var projectingFile by mutableStateOf<File?>(null)
@@ -65,6 +66,7 @@ class MainViewModel(
     // Playlist States
     var playlists by mutableStateOf(emptyList<Playlist>())
     var selectedPlaylist by mutableStateOf<Playlist?>(null)
+    var playingPlaylist by mutableStateOf<Playlist?>(null)
     var recentFiles = mutableStateListOf<com.geraciodev.lumina.data.model.PlaylistItem>()
     var showRecentInOverlay by mutableStateOf(false)
 
@@ -236,7 +238,7 @@ class MainViewModel(
 
     private val audioExtensions = setOf("mp3", "wav", "flac", "ogg", "m4a", "aac", "wma")
     private val mediaExtensions = setOf(
-        "mp4", "mkv", "avi", "mov", "wmv", "flv", "webm",
+        "mp4", "mkv", "avi", "mov", "wmv", "flv", "webm", "mpg", "mpeg",
         "mp3", "wav", "flac", "ogg", "m4a", "aac", "wma"
     )
 
@@ -254,14 +256,16 @@ class MainViewModel(
         }
 
         searchJob = scope.launch {
-            // Debounce to avoid searching on every keystroke
-            delay(300)
-            isSearching = true
-            repository.searchMediaFlow(newQuery)
-                .collect { results ->
+            try {
+                delay(300)
+                isSearching = true
+                repository.searchMediaFlow(newQuery).collect { results ->
                     searchResults = results
+                    isSearching = false
                 }
-            isSearching = false
+            } finally {
+                isSearching = false
+            }
         }
     }
 
@@ -279,9 +283,10 @@ class MainViewModel(
         }
 
         if (fromPlaylist != null) {
-            selectedPlaylist = fromPlaylist
+            playingPlaylist = fromPlaylist
             showRecentInOverlay = false
         } else {
+            playingPlaylist = null
             showRecentInOverlay = true
         }
     }
@@ -298,7 +303,7 @@ class MainViewModel(
     }
 
     fun playNext() {
-        val currentItems = if (showRecentInOverlay) recentFiles else selectedPlaylist?.items ?: emptyList()
+        val currentItems = if (showRecentInOverlay) recentFiles else playingPlaylist?.items ?: emptyList()
         if (currentItems.isEmpty()) return
 
         val currentIndex = currentItems.indexOfFirst { it.filePath == selectedVideo?.absolutePath }
@@ -306,17 +311,17 @@ class MainViewModel(
             val nextIndex = currentIndex + 1
             if (nextIndex < currentItems.size) {
                 val nextItem = currentItems[nextIndex]
-                selectVideo(File(nextItem.filePath), if (showRecentInOverlay) null else selectedPlaylist)
+                selectVideo(File(nextItem.filePath), if (showRecentInOverlay) null else playingPlaylist)
             } else if (playbackMode == PlaybackMode.LOOP_ALL) {
                 // Volver al principio
                 val firstItem = currentItems[0]
-                selectVideo(File(firstItem.filePath), if (showRecentInOverlay) null else selectedPlaylist)
+                selectVideo(File(firstItem.filePath), if (showRecentInOverlay) null else playingPlaylist)
             }
         }
     }
 
     fun playPrevious() {
-        val currentItems = if (showRecentInOverlay) recentFiles else selectedPlaylist?.items ?: emptyList()
+        val currentItems = if (showRecentInOverlay) recentFiles else playingPlaylist?.items ?: emptyList()
         if (currentItems.isEmpty()) return
 
         val currentIndex = currentItems.indexOfFirst { it.filePath == selectedVideo?.absolutePath }
@@ -324,11 +329,11 @@ class MainViewModel(
             val prevIndex = currentIndex - 1
             if (prevIndex >= 0) {
                 val prevItem = currentItems[prevIndex]
-                selectVideo(File(prevItem.filePath), if (showRecentInOverlay) null else selectedPlaylist)
+                selectVideo(File(prevItem.filePath), if (showRecentInOverlay) null else playingPlaylist)
             } else if (playbackMode == PlaybackMode.LOOP_ALL) {
                 // Ir al final
                 val lastItem = currentItems.last()
-                selectVideo(File(lastItem.filePath), if (showRecentInOverlay) null else selectedPlaylist)
+                selectVideo(File(lastItem.filePath), if (showRecentInOverlay) null else playingPlaylist)
             }
         }
     }
@@ -347,6 +352,11 @@ class MainViewModel(
 
     fun stopVideo() {
         selectedVideo = null
+        isAudioOnly = false
+        playingPlaylist = null
+        showRecentInOverlay = false
+        isPlaylistWindowOpen = false
+        projectingFile = null
         VideoManager.stop()
     }
 
@@ -363,6 +373,10 @@ class MainViewModel(
         if (selectedPlaylist?.id == playlist.id) {
             selectedPlaylist = null
         }
+        if (playingPlaylist?.id == playlist.id) {
+            playingPlaylist = null
+            showRecentInOverlay = true
+        }
     }
 
     fun addFilesToPlaylist(playlist: Playlist, files: List<File>) {
@@ -374,6 +388,9 @@ class MainViewModel(
         if (selectedPlaylist?.id == playlist.id) {
             selectedPlaylist = updatedPlaylist
         }
+        if (playingPlaylist?.id == playlist.id) {
+            playingPlaylist = updatedPlaylist
+        }
     }
 
     fun removeItemFromPlaylist(playlist: Playlist, item: com.geraciodev.lumina.data.model.PlaylistItem) {
@@ -384,6 +401,9 @@ class MainViewModel(
         playlistRepository.savePlaylists(playlists)
         if (selectedPlaylist?.id == playlist.id) {
             selectedPlaylist = updatedPlaylist
+        }
+        if (playingPlaylist?.id == playlist.id) {
+            playingPlaylist = updatedPlaylist
         }
     }
     
@@ -442,7 +462,7 @@ class MainViewModel(
                 "Anterior" -> playPrevious()
                 "Alternar Sidebar" -> isSidebarExpanded = !isSidebarExpanded
                 "Alternar Proyección" -> toggleProjection()
-                "Silenciar" -> VideoManager.toggleMute(!VideoManager.mediaPlayer?.audio()?.isMute!!)
+                "Silenciar" -> VideoManager.toggleMute(!VideoManager.isMuted())
                 "Adelantar 5s" -> VideoManager.skip(5000)
                 "Retroceder 5s" -> VideoManager.skip(-5000)
                 "Subir Volumen" -> VideoManager.updateVolume(VideoManager.currentVolume + 5)

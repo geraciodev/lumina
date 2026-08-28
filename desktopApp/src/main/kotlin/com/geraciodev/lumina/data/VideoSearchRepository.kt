@@ -2,35 +2,28 @@ package com.geraciodev.lumina.data
 
 import com.geraciodev.lumina.util.normalize
 import kotlinx.coroutines.*
-import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.io.File
 import java.nio.file.*
 import java.nio.file.attribute.BasicFileAttributes
-import java.util.concurrent.atomic.AtomicInteger
 
 class VideoSearchRepository {
     private val mediaExtensions = setOf(
         // Videos
-        "mp4", "mkv", "avi", "mov", "wmv", "flv", "webm",
+        "mp4", "mkv", "avi", "mov", "wmv", "flv", "webm", "mpg", "mpeg",
         // Audio
         "mp3", "wav", "flac", "ogg", "m4a", "aac", "wma"
     )
-    private val cachedIndex = mutableSetOf<File>()
+    private val cachedIndex = MutableStateFlow<Set<File>>(emptySet())
     private val indexMutex = Mutex()
-    private var isIndexing = false
+    private val indexingMutex = Mutex()
     private val repositoryScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-
-    init {
-        // Iniciar indexación en segundo plano al instanciar el repositorio
-        repositoryScope.launch {
-            buildIndex()
-        }
-    }
 
     private var userFolders = emptyList<File>()
 
@@ -41,49 +34,39 @@ class VideoSearchRepository {
         }
     }
 
-    private suspend fun buildIndex() = coroutineScope {
-        if (isIndexing) return@coroutineScope
-        isIndexing = true
-        
-        // Limpiar índice antes de reconstruir si es necesario, 
-        // o simplemente añadir. Para simplificar, reconstruimos.
-        indexMutex.withLock {
-            cachedIndex.clear()
+    private suspend fun buildIndex() = indexingMutex.withLock {
+        val indexedFiles = mutableSetOf<File>()
+        val roots = if (userFolders.isNotEmpty()) userFolders else getSearchRoots()
+
+        roots.forEach { root ->
+            try {
+                Files.walkFileTree(root.toPath(), object : SimpleFileVisitor<Path>() {
+                    override fun visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult {
+                        if (file.fileName.toString().hasMediaExtension()) {
+                            indexedFiles.add(file.toFile())
+                        }
+                        return FileVisitResult.CONTINUE
+                    }
+
+                    override fun visitFileFailed(file: Path, exc: java.io.IOException): FileVisitResult =
+                        FileVisitResult.SKIP_SUBTREE
+
+                    override fun preVisitDirectory(dir: Path, attrs: BasicFileAttributes): FileVisitResult {
+                        val name = dir.fileName?.toString() ?: ""
+                        return if (shouldSkipDirectory(name, dir.toAbsolutePath().toString(), root.absolutePath)) {
+                            FileVisitResult.SKIP_SUBTREE
+                        } else {
+                            FileVisitResult.CONTINUE
+                        }
+                    }
+                })
+            } catch (_: Exception) {
+                // Una carpeta inaccesible no debe interrumpir la indexación restante.
+            }
         }
 
-        val roots = if (userFolders.isNotEmpty()) userFolders else getSearchRoots()
-        roots.forEach { root ->
-            launch {
-                try {
-                    Files.walkFileTree(root.toPath(), object : SimpleFileVisitor<Path>() {
-                        override fun visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult {
-                            val fileName = file.fileName.toString().lowercase()
-                            if (mediaExtensions.any { fileName.endsWith(".$it") }) {
-                                repositoryScope.launch {
-                                    indexMutex.withLock {
-                                        cachedIndex.add(file.toFile())
-                                    }
-                                }
-                            }
-                            return FileVisitResult.CONTINUE
-                        }
-
-                        override fun visitFileFailed(file: Path, exc: java.io.IOException): FileVisitResult {
-                            return FileVisitResult.SKIP_SUBTREE
-                        }
-
-                        override fun preVisitDirectory(dir: Path, attrs: BasicFileAttributes): FileVisitResult {
-                            val name = dir.fileName?.toString() ?: ""
-                            if (shouldSkipDirectory(name, dir.toAbsolutePath().toString(), root.absolutePath)) {
-                                return FileVisitResult.SKIP_SUBTREE
-                            }
-                            return FileVisitResult.CONTINUE
-                        }
-                    })
-                } catch (e: Exception) {
-                    // Error accediendo a raíz
-                }
-            }
+        indexMutex.withLock {
+            cachedIndex.value = indexedFiles
         }
     }
 
@@ -101,42 +84,34 @@ class VideoSearchRepository {
                 .any { name.equals(it, ignoreCase = true) }
     }
 
-    fun searchMediaFlow(query: String): Flow<List<File>> = callbackFlow {
-        if (query.length < 2) {
-            trySend(emptyList())
-            close()
-            return@callbackFlow
-        }
+    fun searchMediaFlow(query: String): Flow<List<File>> {
+        if (query.length < 2) return flowOf(emptyList())
 
         val normalizedQuery = query.normalize()
         val queryWords = normalizedQuery.split(" ").filter { it.isNotBlank() }
 
-        // Primero enviamos resultados rápidos desde el cache
-        val instantResults = indexMutex.withLock {
-            cachedIndex.filter { file ->
-                val normalizedFileName = file.name.normalize()
-                queryWords.all { normalizedFileName.contains(it) }
+        return cachedIndex.map { files ->
+            files.filter { file ->
+                file.name.matchesQuery(queryWords)
             }
-        }
-        trySend(instantResults)
+        }.flowOn(Dispatchers.Default)
+    }
 
-        if (!isIndexing) {
-            close()
-        }
-        
-        awaitClose { }
-    }.flowOn(Dispatchers.Default)
+    internal fun String.matchesQuery(queryWords: List<String>): Boolean {
+        val normalizedFileName = normalize()
+        return queryWords.all { normalizedFileName.contains(it) }
+    }
+
+    private fun String.hasMediaExtension(): Boolean =
+        mediaExtensions.any { endsWith(".$it", ignoreCase = true) }
 
     private fun getSearchRoots(): List<File> {
         val roots = mutableSetOf<File>()
         
-        // 1. Raíces lógicas reportadas por el SO (C:\, D:\, /)
-        File.listRoots()?.forEach { roots.add(it.absoluteFile) }
-        
-        // 2. Home del usuario (Donde suelen estar los videos)
+        // Directorio personal del usuario (donde normalmente se almacenan medios).
         System.getProperty("user.home")?.let { roots.add(File(it).absoluteFile) }
-        
-        // 3. Puntos de montaje comunes para discos extraíbles y otras particiones
+
+        // Puntos de montaje comunes para discos extraíbles y otras particiones.
         // En Linux moderno (Ubuntu/Fedora/etc), los discos suelen estar en /run/media/USUARIO/ o /media/USUARIO/
         val user = System.getProperty("user.name")
         val mountPoints = listOf(

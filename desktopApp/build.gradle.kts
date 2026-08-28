@@ -17,9 +17,8 @@ dependencies {
     implementation(libs.kotlinx.coroutinesSwing)
     implementation(libs.vlcj)
     
-    // Dependencias de registro para VLCJ
-    implementation("org.slf4j:slf4j-api:2.0.9")
-    implementation("org.slf4j:slf4j-simple:2.0.9")
+    implementation(libs.slf4j.api)
+    implementation(libs.slf4j.simple)
 
     implementation(libs.compose.ui)
     implementation(libs.compose.foundation)
@@ -29,6 +28,9 @@ dependencies {
 
     implementation(libs.compose.uiToolingPreview)
     implementation(libs.kotlinx.serialization.json)
+
+    testImplementation(libs.kotlin.test)
+    testImplementation(libs.kotlin.testJunit)
 }
 
 compose.desktop {

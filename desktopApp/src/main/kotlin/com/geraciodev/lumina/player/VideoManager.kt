@@ -22,6 +22,7 @@ import java.awt.image.BufferedImage
 import java.awt.image.DataBufferInt
 import java.io.File
 import java.nio.ByteBuffer
+import javax.swing.SwingUtilities
 
 object VideoManager {
     private var factory: MediaPlayerFactory? = null
@@ -57,6 +58,14 @@ object VideoManager {
 
     private var bufferImage: BufferedImage? = null
 
+    private fun updateUiState(update: () -> Unit) {
+        if (SwingUtilities.isEventDispatchThread()) {
+            update()
+        } else {
+            SwingUtilities.invokeLater(update)
+        }
+    }
+
     init {
         NativeDiscovery().discover()
 
@@ -85,44 +94,55 @@ object VideoManager {
 
         mediaPlayer?.events()?.addMediaPlayerEventListener(object : MediaPlayerEventAdapter() {
             override fun playing(mediaPlayer: MediaPlayer?) {
-                isPlaying = true
-                duration = mediaPlayer?.status()?.length() ?: 0L
-                // Asegura que el volumen se aplique al inicio de la reproducción
+                val mediaDuration = mediaPlayer?.status()?.length() ?: 0L
                 mediaPlayer?.audio()?.setVolume(currentVolume)
-                updateTracks()
+                updateUiState {
+                    isPlaying = true
+                    duration = mediaDuration
+                    updateTracks()
+                }
             }
 
             override fun audioDeviceChanged(mediaPlayer: MediaPlayer?, audioDevice: String?) {
-                updateTracks()
+                updateUiState { updateTracks() }
             }
 
             override fun paused(mediaPlayer: MediaPlayer?) {
-                isPlaying = false
+                updateUiState { isPlaying = false }
             }
 
             override fun stopped(mediaPlayer: MediaPlayer?) {
-                isPlaying = false
-                currentPosition = 0f
-                currentTime = 0L
-                clearTracks()
+                updateUiState {
+                    isPlaying = false
+                    currentPosition = 0f
+                    currentTime = 0L
+                    clearTracks()
+                }
             }
 
             override fun positionChanged(mediaPlayer: MediaPlayer?, newPosition: Float) {
-                currentPosition = newPosition
-                currentTime = mediaPlayer?.status()?.time() ?: 0L
+                val time = mediaPlayer?.status()?.time() ?: 0L
+                updateUiState {
+                    currentPosition = newPosition
+                    currentTime = time
+                }
             }
 
             override fun lengthChanged(mediaPlayer: MediaPlayer?, newLength: Long) {
-                duration = newLength
+                updateUiState { duration = newLength }
             }
 
             override fun finished(mediaPlayer: MediaPlayer?) {
-                isPlaying = false
-                onVideoFinished?.invoke()
+                updateUiState {
+                    isPlaying = false
+                    onVideoFinished?.invoke()
+                }
             }
 
             override fun volumeChanged(mediaPlayer: MediaPlayer?, volume: Float) {
-                this@VideoManager.currentVolume = (volume * 100).toInt()
+                updateUiState {
+                    this@VideoManager.currentVolume = (volume * 100).toInt()
+                }
             }
         })
 
@@ -143,7 +163,8 @@ object VideoManager {
                 val pixels = (bufferImage!!.raster.dataBuffer as DataBufferInt).data
                 buffer.asIntBuffer().get(pixels)
 
-                videoFrame = bufferImage!!.toComposeImageBitmap()
+                val imageBitmap = bufferImage!!.toComposeImageBitmap()
+                updateUiState { videoFrame = imageBitmap }
             }
         }
 
@@ -202,6 +223,19 @@ object VideoManager {
 
     fun toggleMute(isMuted: Boolean) {
         mediaPlayer?.audio()?.setMute(isMuted)
+    }
+
+    fun isMuted(): Boolean = mediaPlayer?.audio()?.isMute() ?: false
+
+    fun release() {
+        onVideoFinished = null
+        mediaPlayer?.release()
+        mediaPlayer = null
+        factory?.release()
+        factory = null
+        bufferImage = null
+        videoFrame = null
+        clearTracks()
     }
 
     // Gestión de Pistas de Audio y Subtítulos

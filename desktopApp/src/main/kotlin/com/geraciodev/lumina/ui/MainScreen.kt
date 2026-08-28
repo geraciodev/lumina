@@ -16,6 +16,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -62,7 +64,7 @@ fun MainScreen(viewModel: MainViewModel) {
                 }
 
                 // Ventana Flotante de Playlist (Mini Sidebar)
-                if (viewModel.isPlaylistWindowOpen && (viewModel.selectedPlaylist != null || viewModel.showRecentInOverlay)) {
+                if (viewModel.isPlaylistWindowOpen && (viewModel.playingPlaylist != null || viewModel.showRecentInOverlay)) {
                     PlaylistOverlay(viewModel)
                 }
             }
@@ -219,12 +221,18 @@ fun NavIconItem(
 
 @Composable
 fun SearchAndPlayerView(viewModel: MainViewModel) {
+    val focusManager = LocalFocusManager.current
+
     Row(modifier = Modifier.fillMaxSize()) {
         // Sidebar de búsqueda (El que ya teníamos)
         Column(
             modifier = Modifier
                 .weight(0.35f)
                 .fillMaxHeight()
+                .clickable {
+                    focusManager.clearFocus()
+                    viewModel.isSearchInputFocused = false
+                }
                 .padding(start = 24.dp, top = 24.dp, end = 12.dp, bottom = 24.dp)
         ) {
             Text(
@@ -237,7 +245,9 @@ fun SearchAndPlayerView(viewModel: MainViewModel) {
             TextField(
                 value = viewModel.searchQuery,
                 onValueChange = { viewModel.onSearchQueryChanged(it) },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .onFocusChanged { viewModel.isSearchInputFocused = it.isFocused },
                 placeholder = { Text("Buscar archivos...") },
                 singleLine = true,
                 colors = TextFieldDefaults.colors(
@@ -273,7 +283,11 @@ fun SearchAndPlayerView(viewModel: MainViewModel) {
                             )
                         },
                         modifier = Modifier
-                            .clickable { viewModel.selectVideo(file) }
+                            .clickable {
+                                focusManager.clearFocus()
+                                viewModel.isSearchInputFocused = false
+                                viewModel.selectVideo(file)
+                            }
                             .padding(vertical = 2.dp),
                         colors = ListItemDefaults.colors(
                             containerColor = if (isSelected) MaterialTheme.colorScheme.surface else Color.Transparent
@@ -354,7 +368,7 @@ fun SearchAndPlayerView(viewModel: MainViewModel) {
 
                     if (!viewModel.isAudioOnly) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            if (viewModel.selectedPlaylist != null || viewModel.showRecentInOverlay) {
+                            if (viewModel.playingPlaylist != null || viewModel.showRecentInOverlay) {
                                 IconButton(
                                     onClick = { viewModel.isPlaylistWindowOpen = !viewModel.isPlaylistWindowOpen },
                                     modifier = Modifier.padding(end = 8.dp)
@@ -365,6 +379,9 @@ fun SearchAndPlayerView(viewModel: MainViewModel) {
                                         tint = if (viewModel.isPlaylistWindowOpen) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
                                     )
                                 }
+                            }
+                            TextButton(onClick = { viewModel.stopVideo() }) {
+                                Text("DETENER", color = MaterialTheme.colorScheme.error)
                             }
                             Button(
                                 onClick = { viewModel.toggleProjection() },
@@ -377,15 +394,22 @@ fun SearchAndPlayerView(viewModel: MainViewModel) {
                                 )
                             }
                         }
-                    } else if (viewModel.selectedPlaylist != null || viewModel.showRecentInOverlay) {
-                        IconButton(
-                            onClick = { viewModel.isPlaylistWindowOpen = !viewModel.isPlaylistWindowOpen }
-                        ) {
-                            Icon(
-                                Icons.AutoMirrored.Filled.PlaylistPlay,
-                                contentDescription = "Ver Playlist",
-                                tint = if (viewModel.isPlaylistWindowOpen) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
-                            )
+                    } else {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (viewModel.playingPlaylist != null || viewModel.showRecentInOverlay) {
+                                IconButton(
+                                    onClick = { viewModel.isPlaylistWindowOpen = !viewModel.isPlaylistWindowOpen }
+                                ) {
+                                    Icon(
+                                        Icons.AutoMirrored.Filled.PlaylistPlay,
+                                        contentDescription = "Ver Playlist",
+                                        tint = if (viewModel.isPlaylistWindowOpen) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
+                                    )
+                                }
+                            }
+                            TextButton(onClick = { viewModel.stopVideo() }) {
+                                Text("DETENER", color = MaterialTheme.colorScheme.error)
+                            }
                         }
                     }
                 }
@@ -407,8 +431,8 @@ fun SearchAndPlayerView(viewModel: MainViewModel) {
 
 @Composable
 fun PlaylistOverlay(viewModel: MainViewModel) {
-    val items = if (viewModel.showRecentInOverlay) viewModel.recentFiles else viewModel.selectedPlaylist?.items ?: emptyList()
-    val title = if (viewModel.showRecentInOverlay) "RECIENTES" else viewModel.selectedPlaylist?.name ?: ""
+    val items = if (viewModel.showRecentInOverlay) viewModel.recentFiles else viewModel.playingPlaylist?.items ?: emptyList()
+    val title = if (viewModel.showRecentInOverlay) "RECIENTES" else viewModel.playingPlaylist?.name ?: ""
     
     Box(
         modifier = Modifier
@@ -450,7 +474,7 @@ fun PlaylistOverlay(viewModel: MainViewModel) {
                             val file = File(item.filePath)
                             if (file.exists()) {
                                 // Si estamos en modo recientes, mantenemos el modo recientes al seleccionar
-                                viewModel.selectVideo(file, if (viewModel.showRecentInOverlay) null else viewModel.selectedPlaylist)
+                                viewModel.selectVideo(file, if (viewModel.showRecentInOverlay) null else viewModel.playingPlaylist)
                             }
                         },
                         colors = ListItemDefaults.colors(

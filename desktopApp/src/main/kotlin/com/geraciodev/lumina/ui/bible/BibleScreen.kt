@@ -12,6 +12,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -19,6 +21,7 @@ import com.geraciodev.lumina.ui.MainViewModel
 
 @Composable
 fun BibleScreen(viewModel: MainViewModel) {
+    val focusManager = LocalFocusManager.current
     val bible = viewModel.bibleVersion
     val selectedBook = viewModel.selectedBibleBook
     val selectedChapter = viewModel.selectedBibleChapter
@@ -30,6 +33,10 @@ fun BibleScreen(viewModel: MainViewModel) {
             modifier = Modifier
                 .weight(0.35f)
                 .fillMaxHeight()
+                .clickable {
+                    focusManager.clearFocus()
+                    viewModel.isSearchInputFocused = false
+                }
                 .padding(start = 24.dp, top = 24.dp, end = 12.dp, bottom = 24.dp)
         ) {
             Text(
@@ -42,7 +49,9 @@ fun BibleScreen(viewModel: MainViewModel) {
             TextField(
                 value = viewModel.bibleSearchQuery,
                 onValueChange = { viewModel.onBibleSearchQueryChanged(it) },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .onFocusChanged { viewModel.isSearchInputFocused = it.isFocused },
                 placeholder = { Text("Buscar palabra o frase...") },
                 singleLine = true,
                 colors = TextFieldDefaults.colors(
@@ -75,7 +84,11 @@ fun BibleScreen(viewModel: MainViewModel) {
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable { viewModel.navigateToSearchResult(result) }
+                                .clickable {
+                                    focusManager.clearFocus()
+                                    viewModel.isSearchInputFocused = false
+                                    viewModel.navigateToSearchResult(result)
+                                }
                                 .padding(vertical = 8.dp, horizontal = 4.dp)
                         ) {
                             Text(

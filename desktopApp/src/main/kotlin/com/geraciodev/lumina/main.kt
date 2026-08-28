@@ -12,6 +12,7 @@ import com.geraciodev.lumina.data.BibleRepository
 import androidx.compose.ui.input.key.*
 import com.geraciodev.lumina.data.SettingsRepository
 import com.geraciodev.lumina.data.model.ShortcutConfig
+import com.geraciodev.lumina.player.VideoManager
 import com.geraciodev.lumina.ui.MainScreen
 import com.geraciodev.lumina.ui.MainViewModel
 import com.geraciodev.lumina.ui.VideoPlayer
@@ -45,6 +46,7 @@ fun main() = application {
                 viewModel.windowHeight = windowState.size.height.value.toInt()
             }
             viewModel.saveCurrentSettings()
+            VideoManager.release()
             exitApplication()
         },
         title = "Lumina - Reproductor Multimedia",
@@ -64,6 +66,8 @@ fun main() = application {
                     )
                     viewModel.recordingShortcutName = null
                     true
+                } else if (viewModel.isSearchInputFocused) {
+                    false
                 } else {
                     viewModel.handleKeyEvent(
                         keyCode = keyEvent.key.nativeKeyCode,
