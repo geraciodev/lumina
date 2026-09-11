@@ -9,14 +9,21 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.onPointerEvent
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.geraciodev.lumina.player.VideoManager
-import kotlin.math.floor
+import kotlin.math.roundToInt
 
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun VideoPlayer(
     viewModel: MainViewModel,
@@ -54,6 +61,7 @@ fun VideoPlayer(
     }
 }
 
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun VideoControls(viewModel: MainViewModel, modifier: Modifier = Modifier) {
     val isPlaying = VideoManager.isPlaying
@@ -69,22 +77,68 @@ fun VideoControls(viewModel: MainViewModel, modifier: Modifier = Modifier) {
     var showAudioMenu by remember { mutableStateOf(false) }
     var showSubsMenu by remember { mutableStateOf(false) }
 
+    var hoverTime by remember { mutableStateOf<Long?>(null) }
+    var hoverX by remember { mutableStateOf(0f) }
+    var sliderWidthPx by remember { mutableStateOf(0) }
+    val density = LocalDensity.current
+
     Surface(
         modifier = modifier,
         color = Color.Black.copy(alpha = 0.6f),
         shape = androidx.compose.ui.graphics.RectangleShape
     ) {
         Column(modifier = Modifier.padding(8.dp)) {
-            // Seek bar
-            Slider(
-                value = position,
-                onValueChange = { VideoManager.seekTo(it) },
-                modifier = Modifier.fillMaxWidth().height(20.dp),
-                colors = SliderDefaults.colors(
-                    thumbColor = MaterialTheme.colorScheme.primary,
-                    activeTrackColor = MaterialTheme.colorScheme.primary
+            // Seek bar with Hover Preview
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(40.dp) // Aumentamos altura para el tooltip
+                    .onGloballyPositioned { sliderWidthPx = it.size.width }
+                    .onPointerEvent(PointerEventType.Move) { event ->
+                        val x = event.changes.first().position.x
+                        if (sliderWidthPx > 0 && duration > 0) {
+                            val ratio = (x / sliderWidthPx).coerceIn(0f, 1f)
+                            hoverTime = (ratio * duration).toLong()
+                            hoverX = x
+                        }
+                    }
+                    .onPointerEvent(PointerEventType.Exit) {
+                        hoverTime = null
+                    },
+                contentAlignment = Alignment.BottomCenter
+            ) {
+                // Tooltip de tiempo
+                hoverTime?.let { time ->
+                    Surface(
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .offset {
+                                val tooltipWidth = with(density) { 60.dp.toPx() }
+                                val offsetX = (hoverX - tooltipWidth / 2).coerceIn(0f, sliderWidthPx - tooltipWidth)
+                                IntOffset(offsetX.roundToInt(), 0)
+                            },
+                        color = MaterialTheme.colorScheme.primary,
+                        shape = MaterialTheme.shapes.extraSmall
+                    ) {
+                        Text(
+                            text = formatTime(time),
+                            color = Color.Black,
+                            fontSize = 10.sp,
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+
+                Slider(
+                    value = position,
+                    onValueChange = { VideoManager.seekTo(it) },
+                    modifier = Modifier.fillMaxWidth().height(20.dp),
+                    colors = SliderDefaults.colors(
+                        thumbColor = MaterialTheme.colorScheme.primary,
+                        activeTrackColor = MaterialTheme.colorScheme.primary
+                    )
                 )
-            )
+            }
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -250,7 +304,13 @@ fun VideoControls(viewModel: MainViewModel, modifier: Modifier = Modifier) {
 
 private fun formatTime(ms: Long): String {
     val totalSeconds = ms / 1000
-    val minutes = floor(totalSeconds.toDouble() / 60).toInt()
-    val seconds = (totalSeconds % 60).toInt()
-    return "%02d:%02d".format(minutes, seconds)
+    val hours = totalSeconds / 3600
+    val minutes = (totalSeconds % 3600) / 60
+    val seconds = totalSeconds % 60
+    
+    return if (hours > 0) {
+        "%02d:%02d:%02d".format(hours, minutes, seconds)
+    } else {
+        "%02d:%02d".format(minutes, seconds)
+    }
 }

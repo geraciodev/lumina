@@ -1,6 +1,6 @@
 package com.geraciodev.lumina
 
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
@@ -16,6 +16,8 @@ import com.geraciodev.lumina.player.VideoManager
 import com.geraciodev.lumina.ui.MainScreen
 import com.geraciodev.lumina.ui.MainViewModel
 import com.geraciodev.lumina.ui.VideoPlayer
+import com.geraciodev.lumina.ui.WindowTitleBar
+import com.geraciodev.lumina.ui.theme.LuminaTheme
 import com.geraciodev.lumina.ui.bible.BibleProjectionView
 import java.awt.GraphicsEnvironment
 
@@ -51,6 +53,7 @@ fun main() = application {
         },
         title = "Lumina - Reproductor Multimedia",
         state = windowState,
+        undecorated = true,
         onPreviewKeyEvent = { keyEvent ->
             if (keyEvent.type == KeyEventType.KeyDown) {
                 val recordingName = viewModel.recordingShortcutName
@@ -66,7 +69,7 @@ fun main() = application {
                     )
                     viewModel.recordingShortcutName = null
                     true
-                } else if (viewModel.isSearchInputFocused) {
+                } else if (viewModel.isAnyInputFocused) {
                     false
                 } else {
                     viewModel.handleKeyEvent(
@@ -79,7 +82,33 @@ fun main() = application {
             } else false
         }
     ) {
-        MainScreen(viewModel)
+        LuminaTheme(darkTheme = viewModel.isDarkMode) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                WindowTitleBar(
+                    title = "Lumina - Reproductor Multimedia",
+                    isMaximized = windowState.placement == WindowPlacement.Maximized,
+                    onMinimize = { windowState.isMinimized = true },
+                    onMaximize = {
+                        windowState.placement = if (windowState.placement == WindowPlacement.Maximized) {
+                            WindowPlacement.Floating
+                        } else {
+                            WindowPlacement.Maximized
+                        }
+                    },
+                    onClose = {
+                        viewModel.isMaximized = windowState.placement == WindowPlacement.Maximized
+                        if (!viewModel.isMaximized) {
+                            viewModel.windowWidth = windowState.size.width.value.toInt()
+                            viewModel.windowHeight = windowState.size.height.value.toInt()
+                        }
+                        viewModel.saveCurrentSettings()
+                        VideoManager.release()
+                        exitApplication()
+                    }
+                )
+                MainScreen(viewModel)
+            }
+        }
     }
 
     // Ventana de Proyección (Segunda Pantalla)
@@ -104,6 +133,11 @@ fun main() = application {
             undecorated = secondScreen != null,
             alwaysOnTop = secondScreen != null
         ) {
+            // Evitar que la ventana de proyección robe el foco de la ventana principal
+            LaunchedEffect(Unit) {
+                window.focusableWindowState = false
+            }
+
             if (projectingFile != null) {
                 VideoPlayer(
                     viewModel = viewModel,

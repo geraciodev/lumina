@@ -2,6 +2,7 @@ package com.geraciodev.lumina.ui.playlist
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -13,6 +14,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -30,9 +32,11 @@ fun PlaylistScreen(viewModel: MainViewModel) {
     Row(
         modifier = Modifier
             .fillMaxSize()
-            .clickable {
-                focusManager.clearFocus()
-                viewModel.isSearchInputFocused = false
+            .pointerInput(Unit) {
+                detectTapGestures {
+                    focusManager.clearFocus()
+                    viewModel.isAnyInputFocused = false
+                }
             }
     ) {
         // Lista de Playlists (Sidebar de Playlists)
@@ -133,11 +137,18 @@ fun PlaylistScreen(viewModel: MainViewModel) {
                     onValueChange = { playlistSearchQuery = it },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .onFocusChanged { viewModel.isSearchInputFocused = it.isFocused },
+                        .onFocusChanged { viewModel.isAnyInputFocused = it.isFocused },
                     placeholder = { Text("Buscar en la playlist...") },
                     singleLine = true,
                     leadingIcon = {
                         Icon(Icons.Default.Search, contentDescription = "Buscar")
+                    },
+                    trailingIcon = {
+                        if (playlistSearchQuery.isNotEmpty()) {
+                            IconButton(onClick = { playlistSearchQuery = "" }) {
+                                Icon(Icons.Default.Clear, contentDescription = "Limpiar")
+                            }
+                        }
                     },
                     colors = TextFieldDefaults.colors(
                         focusedIndicatorColor = MaterialTheme.colorScheme.primary,
@@ -196,13 +207,18 @@ fun PlaylistScreen(viewModel: MainViewModel) {
             onCreate = { name, files ->
                 viewModel.createPlaylist(name, files)
                 showCreateDialog = false
-            }
+            },
+            onFocusChanged = { viewModel.isAnyInputFocused = it }
         )
     }
 }
 
 @Composable
-fun CreatePlaylistDialog(onDismiss: () -> Unit, onCreate: (String, List<File>) -> Unit) {
+fun CreatePlaylistDialog(
+    onDismiss: () -> Unit,
+    onCreate: (String, List<File>) -> Unit,
+    onFocusChanged: (Boolean) -> Unit
+) {
     var name by remember { mutableStateOf("") }
     var selectedFiles by remember { mutableStateOf(emptyList<File>()) }
 
@@ -218,7 +234,16 @@ fun CreatePlaylistDialog(onDismiss: () -> Unit, onCreate: (String, List<File>) -
                     value = name,
                     onValueChange = { name = it },
                     label = { Text("Nombre de la playlist") },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .onFocusChanged { onFocusChanged(it.isFocused) },
+                    trailingIcon = {
+                        if (name.isNotEmpty()) {
+                            IconButton(onClick = { name = "" }) {
+                                Icon(Icons.Default.Clear, contentDescription = "Limpiar")
+                            }
+                        }
+                    }
                 )
                 Spacer(Modifier.height(16.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {

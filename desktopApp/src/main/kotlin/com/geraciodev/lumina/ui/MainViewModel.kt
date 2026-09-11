@@ -37,7 +37,7 @@ class MainViewModel(
     var searchQuery by mutableStateOf("")
     var searchResults by mutableStateOf(emptyList<File>())
     var isSearching by mutableStateOf(false)
-    var isSearchInputFocused by mutableStateOf(false)
+    var isAnyInputFocused by mutableStateOf(false)
     var selectedVideo by mutableStateOf<File?>(null)
     var isAudioOnly by mutableStateOf(false)
     var projectingFile by mutableStateOf<File?>(null)
@@ -78,6 +78,7 @@ class MainViewModel(
     var bibleSearchQuery by mutableStateOf("")
     var bibleSearchResults by mutableStateOf(emptyList<BibleRepository.SearchResult>())
     var isBibleSearching by mutableStateOf(false)
+    var scrollToVerseIndex by mutableStateOf<Int?>(null)
 
     init {
         val settings = settingsRepository.loadSettings()
@@ -193,6 +194,7 @@ class MainViewModel(
     }
 
     fun projectSelectedVerses() {
+        isAnyInputFocused = false
         val chapter = selectedBibleChapter ?: return
         if (selectedVerses.isEmpty()) return
 
@@ -231,6 +233,7 @@ class MainViewModel(
     }
 
     fun stopProjection() {
+        isAnyInputFocused = false
         projectingFile = null
         projectingBibleVerses = null
         projectingBibleRef = ""
@@ -471,6 +474,8 @@ class MainViewModel(
                 "Capítulo Anterior" -> previousBibleChapter()
                 "Siguiente Libro" -> nextBibleBook()
                 "Libro Anterior" -> previousBibleBook()
+                "Siguiente Versículo" -> projectNextVerse()
+                "Versículo Anterior" -> projectPreviousVerse()
             }
             return true
         }
@@ -518,10 +523,82 @@ class MainViewModel(
                 selectedBibleChapter = chapter
                 selectedVerses.clear()
                 selectedVerses.addAll(result.verseNumbers)
+                syncScrollToSelected()
             }
         }
         // Limpiar búsqueda al navegar
         bibleSearchQuery = ""
         bibleSearchResults = emptyList()
+    }
+
+    private fun syncScrollToSelected() {
+        val chapter = selectedBibleChapter ?: return
+        val firstVerse = selectedVerses.firstOrNull() ?: return
+        val index = chapter.items.indexOfFirst {
+            it.type == "verse" && it.verse_numbers.contains(firstVerse)
+        }
+        if (index != -1) {
+            scrollToVerseIndex = index + 1 // +1 por el header del capítulo
+        }
+    }
+
+    fun projectNextVerse() {
+        val chapter = selectedBibleChapter ?: return
+        val currentVerses = selectedVerses.toList()
+        if (currentVerses.isEmpty()) return
+
+        val lastVerse = currentVerses.last()
+        val allVerses = chapter.items.filter { it.type == "verse" }
+        val currentIndex = allVerses.indexOfFirst { it.verse_numbers.contains(lastVerse) }
+
+        if (currentIndex != -1 && currentIndex < allVerses.size - 1) {
+            // Siguiente versículo en el mismo capítulo
+            val nextVerseItem = allVerses[currentIndex + 1]
+            selectedVerses.clear()
+            selectedVerses.addAll(nextVerseItem.verse_numbers)
+            projectSelectedVerses()
+            syncScrollToSelected()
+        } else {
+            // Siguiente capítulo
+            nextBibleChapter()
+            val newChapter = selectedBibleChapter ?: return
+            val firstVerseItem = newChapter.items.firstOrNull { it.type == "verse" }
+            if (firstVerseItem != null) {
+                selectedVerses.clear()
+                selectedVerses.addAll(firstVerseItem.verse_numbers)
+                projectSelectedVerses()
+                syncScrollToSelected()
+            }
+        }
+    }
+
+    fun projectPreviousVerse() {
+        val chapter = selectedBibleChapter ?: return
+        val currentVerses = selectedVerses.toList()
+        if (currentVerses.isEmpty()) return
+
+        val firstVerse = currentVerses.first()
+        val allVerses = chapter.items.filter { it.type == "verse" }
+        val currentIndex = allVerses.indexOfFirst { it.verse_numbers.contains(firstVerse) }
+
+        if (currentIndex > 0) {
+            // Versículo anterior en el mismo capítulo
+            val prevVerseItem = allVerses[currentIndex - 1]
+            selectedVerses.clear()
+            selectedVerses.addAll(prevVerseItem.verse_numbers)
+            projectSelectedVerses()
+            syncScrollToSelected()
+        } else {
+            // Capítulo anterior
+            previousBibleChapter()
+            val newChapter = selectedBibleChapter ?: return
+            val lastVerseItem = newChapter.items.lastOrNull { it.type == "verse" }
+            if (lastVerseItem != null) {
+                selectedVerses.clear()
+                selectedVerses.addAll(lastVerseItem.verse_numbers)
+                projectSelectedVerses()
+                syncScrollToSelected()
+            }
+        }
     }
 }

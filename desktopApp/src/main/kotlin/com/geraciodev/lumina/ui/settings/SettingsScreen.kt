@@ -207,6 +207,7 @@ fun SettingsScreen(viewModel: MainViewModel) {
                                             .width(240.dp)
                                             .onFocusChanged { 
                                                 if (it.isFocused) fontMenuExpanded = true 
+                                                viewModel.isAnyInputFocused = it.isFocused
                                             },
                                         textStyle = MaterialTheme.typography.bodySmall,
                                         singleLine = true,

@@ -39,5 +39,7 @@ val defaultShortcuts = mapOf(
     "Siguiente Capítulo" to ShortcutConfig(39, ctrl = true), // Ctrl + Right Arrow
     "Capítulo Anterior" to ShortcutConfig(37, ctrl = true),  // Ctrl + Left Arrow
     "Siguiente Libro" to ShortcutConfig(40, ctrl = true),    // Ctrl + Down Arrow
-    "Libro Anterior" to ShortcutConfig(38, ctrl = true)      // Ctrl + Up Arrow
+    "Libro Anterior" to ShortcutConfig(38, ctrl = true),     // Ctrl + Up Arrow
+    "Siguiente Versículo" to ShortcutConfig(34),             // Page Down
+    "Versículo Anterior" to ShortcutConfig(33)               // Page Up
 )

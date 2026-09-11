@@ -3,6 +3,7 @@ package com.geraciodev.lumina.ui
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -17,12 +18,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.io.File
-import com.geraciodev.lumina.ui.theme.LuminaTheme
 import com.geraciodev.lumina.ui.playlist.PlaylistScreen
 import com.geraciodev.lumina.ui.bible.BibleScreen
 import com.geraciodev.lumina.ui.settings.SettingsScreen
@@ -30,43 +31,46 @@ import com.geraciodev.lumina.ui.about.AboutScreen
 
 @Composable
 fun MainScreen(viewModel: MainViewModel) {
-    LuminaTheme(darkTheme = viewModel.isDarkMode) {
-        Surface(
-            modifier = Modifier.fillMaxSize(),
-            color = MaterialTheme.colorScheme.background
-        ) {
-            Row(modifier = Modifier.fillMaxSize()) {
-                // Barra de Navegación Lateral (Sidebar)
-                NavigationSidebar(
-                    currentScreen = viewModel.currentScreen,
-                    isExpanded = viewModel.isSidebarExpanded,
-                    onScreenSelected = { viewModel.currentScreen = it },
-                    onExpandToggle = { viewModel.isSidebarExpanded = !viewModel.isSidebarExpanded }
-                )
+    val focusManager = LocalFocusManager.current
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background
+    ) {
+        Row(modifier = Modifier.fillMaxSize()) {
+            // Barra de Navegación Lateral (Sidebar)
+            NavigationSidebar(
+                currentScreen = viewModel.currentScreen,
+                isExpanded = viewModel.isSidebarExpanded,
+                onScreenSelected = { 
+                    focusManager.clearFocus()
+                    viewModel.isAnyInputFocused = false
+                    viewModel.currentScreen = it 
+                },
+                onExpandToggle = { viewModel.isSidebarExpanded = !viewModel.isSidebarExpanded }
+            )
 
-                // Separador vertical minimalista
-                Box(
-                    modifier = Modifier
-                        .fillMaxHeight()
-                        .width(1.dp)
-                        .background(MaterialTheme.colorScheme.onBackground.copy(alpha = 0.1f))
-                )
+            // Separador vertical minimalista
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .width(1.dp)
+                    .background(MaterialTheme.colorScheme.onBackground.copy(alpha = 0.1f))
+            )
 
-                // Área de Contenido Principal
-                Box(modifier = Modifier.weight(1f)) {
-                    when (viewModel.currentScreen) {
-                        LuminaScreen.SEARCH -> SearchAndPlayerView(viewModel)
-                        LuminaScreen.PLAYLIST -> PlaylistScreen(viewModel)
-                        LuminaScreen.BIBLE -> BibleScreen(viewModel)
-                        LuminaScreen.SETTINGS -> SettingsScreen(viewModel)
-                        LuminaScreen.ABOUT -> AboutScreen()
-                    }
+            // Área de Contenido Principal
+            Box(modifier = Modifier.weight(1f)) {
+                when (viewModel.currentScreen) {
+                    LuminaScreen.SEARCH -> SearchAndPlayerView(viewModel)
+                    LuminaScreen.PLAYLIST -> PlaylistScreen(viewModel)
+                    LuminaScreen.BIBLE -> BibleScreen(viewModel)
+                    LuminaScreen.SETTINGS -> SettingsScreen(viewModel)
+                    LuminaScreen.ABOUT -> AboutScreen()
                 }
+            }
 
-                // Ventana Flotante de Playlist (Mini Sidebar)
-                if (viewModel.isPlaylistWindowOpen && (viewModel.playingPlaylist != null || viewModel.showRecentInOverlay)) {
-                    PlaylistOverlay(viewModel)
-                }
+            // Ventana Flotante de Playlist (Mini Sidebar)
+            if (viewModel.isPlaylistWindowOpen && (viewModel.playingPlaylist != null || viewModel.showRecentInOverlay)) {
+                PlaylistOverlay(viewModel)
             }
         }
     }
@@ -229,9 +233,11 @@ fun SearchAndPlayerView(viewModel: MainViewModel) {
             modifier = Modifier
                 .weight(0.35f)
                 .fillMaxHeight()
-                .clickable {
-                    focusManager.clearFocus()
-                    viewModel.isSearchInputFocused = false
+                .pointerInput(Unit) {
+                    detectTapGestures {
+                        focusManager.clearFocus()
+                        viewModel.isAnyInputFocused = false
+                    }
                 }
                 .padding(start = 24.dp, top = 24.dp, end = 12.dp, bottom = 24.dp)
         ) {
@@ -247,7 +253,7 @@ fun SearchAndPlayerView(viewModel: MainViewModel) {
                 onValueChange = { viewModel.onSearchQueryChanged(it) },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .onFocusChanged { viewModel.isSearchInputFocused = it.isFocused },
+                    .onFocusChanged { viewModel.isAnyInputFocused = it.isFocused },
                 placeholder = { Text("Buscar archivos...") },
                 singleLine = true,
                 colors = TextFieldDefaults.colors(
@@ -257,8 +263,18 @@ fun SearchAndPlayerView(viewModel: MainViewModel) {
                     unfocusedContainerColor = Color.Transparent
                 ),
                 trailingIcon = {
-                    if (viewModel.isSearching) {
-                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (viewModel.searchQuery.isNotEmpty()) {
+                            IconButton(onClick = { viewModel.onSearchQueryChanged("") }) {
+                                Icon(Icons.Default.Clear, contentDescription = "Limpiar")
+                            }
+                        }
+                        if (viewModel.isSearching) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                strokeWidth = 2.dp
+                            )
+                        }
                     }
                 }
             )
@@ -285,7 +301,7 @@ fun SearchAndPlayerView(viewModel: MainViewModel) {
                         modifier = Modifier
                             .clickable {
                                 focusManager.clearFocus()
-                                viewModel.isSearchInputFocused = false
+                                viewModel.isAnyInputFocused = false
                                 viewModel.selectVideo(file)
                             }
                             .padding(vertical = 2.dp),
@@ -370,7 +386,10 @@ fun SearchAndPlayerView(viewModel: MainViewModel) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             if (viewModel.playingPlaylist != null || viewModel.showRecentInOverlay) {
                                 IconButton(
-                                    onClick = { viewModel.isPlaylistWindowOpen = !viewModel.isPlaylistWindowOpen },
+                                    onClick = {
+                                        viewModel.isPlaylistWindowOpen =
+                                            !viewModel.isPlaylistWindowOpen
+                                    },
                                     modifier = Modifier.padding(end = 8.dp)
                                 ) {
                                     Icon(
@@ -380,12 +399,21 @@ fun SearchAndPlayerView(viewModel: MainViewModel) {
                                     )
                                 }
                             }
-                            TextButton(onClick = { viewModel.stopVideo() }) {
+                            TextButton(onClick = { 
+                                focusManager.clearFocus()
+                                viewModel.stopVideo() 
+                            }) {
                                 Text("DETENER", color = MaterialTheme.colorScheme.error)
                             }
                             Button(
-                                onClick = { viewModel.toggleProjection() },
-                                contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp),
+                                onClick = { 
+                                    focusManager.clearFocus()
+                                    viewModel.toggleProjection() 
+                                },
+                                contentPadding = PaddingValues(
+                                    horizontal = 24.dp,
+                                    vertical = 12.dp
+                                ),
                                 shape = MaterialTheme.shapes.small
                             ) {
                                 Text(
@@ -398,7 +426,10 @@ fun SearchAndPlayerView(viewModel: MainViewModel) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             if (viewModel.playingPlaylist != null || viewModel.showRecentInOverlay) {
                                 IconButton(
-                                    onClick = { viewModel.isPlaylistWindowOpen = !viewModel.isPlaylistWindowOpen }
+                                    onClick = {
+                                        viewModel.isPlaylistWindowOpen =
+                                            !viewModel.isPlaylistWindowOpen
+                                    }
                                 ) {
                                     Icon(
                                         Icons.AutoMirrored.Filled.PlaylistPlay,
@@ -407,7 +438,10 @@ fun SearchAndPlayerView(viewModel: MainViewModel) {
                                     )
                                 }
                             }
-                            TextButton(onClick = { viewModel.stopVideo() }) {
+                            TextButton(onClick = { 
+                                focusManager.clearFocus()
+                                viewModel.stopVideo() 
+                            }) {
                                 Text("DETENER", color = MaterialTheme.colorScheme.error)
                             }
                         }
@@ -431,9 +465,12 @@ fun SearchAndPlayerView(viewModel: MainViewModel) {
 
 @Composable
 fun PlaylistOverlay(viewModel: MainViewModel) {
-    val items = if (viewModel.showRecentInOverlay) viewModel.recentFiles else viewModel.playingPlaylist?.items ?: emptyList()
-    val title = if (viewModel.showRecentInOverlay) "RECIENTES" else viewModel.playingPlaylist?.name ?: ""
-    
+    val items =
+        if (viewModel.showRecentInOverlay) viewModel.recentFiles else viewModel.playingPlaylist?.items
+            ?: emptyList()
+    val title =
+        if (viewModel.showRecentInOverlay) "RECIENTES" else viewModel.playingPlaylist?.name ?: ""
+
     Box(
         modifier = Modifier
             .fillMaxHeight()
@@ -474,7 +511,10 @@ fun PlaylistOverlay(viewModel: MainViewModel) {
                             val file = File(item.filePath)
                             if (file.exists()) {
                                 // Si estamos en modo recientes, mantenemos el modo recientes al seleccionar
-                                viewModel.selectVideo(file, if (viewModel.showRecentInOverlay) null else viewModel.playingPlaylist)
+                                viewModel.selectVideo(
+                                    file,
+                                    if (viewModel.showRecentInOverlay) null else viewModel.playingPlaylist
+                                )
                             }
                         },
                         colors = ListItemDefaults.colors(
@@ -482,7 +522,10 @@ fun PlaylistOverlay(viewModel: MainViewModel) {
                         ),
                         leadingContent = {
                             Icon(
-                                imageVector = if (item.fileName.endsWith(".mp3") || item.fileName.endsWith(".wav"))
+                                imageVector = if (item.fileName.endsWith(".mp3") || item.fileName.endsWith(
+                                        ".wav"
+                                    )
+                                )
                                     Icons.Default.MusicNote else Icons.Default.Movie,
                                 contentDescription = null,
                                 modifier = Modifier.size(16.dp)
