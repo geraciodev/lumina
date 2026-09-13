@@ -20,14 +20,22 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.geraciodev.lumina.data.model.Playlist
 import com.geraciodev.lumina.ui.MainViewModel
+import com.geraciodev.lumina.ui.filepicker.FilePickerDialog
+import com.geraciodev.lumina.ui.filepicker.FilePickerMode
 import java.io.File
-import javax.swing.JFileChooser
+
+private val playlistMediaExtensions = setOf(
+    "mp4", "mkv", "avi", "mov", "wmv", "flv", "webm", "mpg", "mpeg",
+    "mp3", "wav", "flac", "ogg", "m4a", "aac", "wma"
+)
 
 @Composable
 fun PlaylistScreen(viewModel: MainViewModel) {
     val focusManager = LocalFocusManager.current
     var showCreateDialog by remember { mutableStateOf(false) }
     var playlistSearchQuery by remember { mutableStateOf("") }
+    var showAddFilesPicker by remember { mutableStateOf(false) }
+    var showAddFolderPicker by remember { mutableStateOf(false) }
 
     Row(
         modifier = Modifier
@@ -112,19 +120,10 @@ fun PlaylistScreen(viewModel: MainViewModel) {
                     )
 
                     Row {
-                        IconButton(onClick = {
-                            val files = pickFiles()
-                            if (files.isNotEmpty()) viewModel.playlist.addFilesToPlaylist(selected, files)
-                        }) {
+                        IconButton(onClick = { showAddFilesPicker = true }) {
                             Icon(Icons.Default.UploadFile, contentDescription = "Añadir archivos")
                         }
-                        IconButton(onClick = {
-                            val folder = pickFolder()
-                            if (folder != null) {
-                                val files = viewModel.playlist.loadFilesFromFolder(folder)
-                                viewModel.playlist.addFilesToPlaylist(selected, files)
-                            }
-                        }) {
+                        IconButton(onClick = { showAddFolderPicker = true }) {
                             Icon(Icons.Default.CreateNewFolder, contentDescription = "Añadir carpeta")
                         }
                     }
@@ -211,6 +210,35 @@ fun PlaylistScreen(viewModel: MainViewModel) {
             onFocusChanged = { viewModel.isAnyInputFocused = it }
         )
     }
+
+    val selectedForPicker = viewModel.playlist.selectedPlaylist
+    if (showAddFilesPicker && selectedForPicker != null) {
+        FilePickerDialog(
+            title = "Añadir archivos a la playlist",
+            mode = FilePickerMode.FILES,
+            allowMultiple = true,
+            extensionFilter = playlistMediaExtensions,
+            onDismiss = { showAddFilesPicker = false },
+            onConfirm = { files ->
+                if (files.isNotEmpty()) viewModel.playlist.addFilesToPlaylist(selectedForPicker, files)
+                showAddFilesPicker = false
+            }
+        )
+    }
+    if (showAddFolderPicker && selectedForPicker != null) {
+        FilePickerDialog(
+            title = "Añadir carpeta a la playlist",
+            mode = FilePickerMode.FOLDER,
+            onDismiss = { showAddFolderPicker = false },
+            onConfirm = { folders ->
+                folders.firstOrNull()?.let { folder ->
+                    val files = viewModel.playlist.loadFilesFromFolder(folder)
+                    viewModel.playlist.addFilesToPlaylist(selectedForPicker, files)
+                }
+                showAddFolderPicker = false
+            }
+        )
+    }
 }
 
 @Composable
@@ -221,6 +249,8 @@ fun CreatePlaylistDialog(
 ) {
     var name by remember { mutableStateOf("") }
     var selectedFiles by remember { mutableStateOf(emptyList<File>()) }
+    var showFilesPicker by remember { mutableStateOf(false) }
+    var showFolderPicker by remember { mutableStateOf(false) }
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(
@@ -248,19 +278,14 @@ fun CreatePlaylistDialog(
                 Spacer(Modifier.height(16.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(
-                        onClick = { selectedFiles = pickFiles() },
+                        onClick = { showFilesPicker = true },
                         modifier = Modifier.weight(1f),
                         shape = MaterialTheme.shapes.small
                     ) {
                         Text("ARCHIVOS")
                     }
                     Button(
-                        onClick = { 
-                            val folder = pickFolder()
-                            if (folder != null) {
-                                selectedFiles = folder.listFiles()?.filter { it.isFile } ?: emptyList()
-                            }
-                        },
+                        onClick = { showFolderPicker = true },
                         modifier = Modifier.weight(1f),
                         shape = MaterialTheme.shapes.small
                     ) {
@@ -288,23 +313,31 @@ fun CreatePlaylistDialog(
             }
         }
     }
-}
 
-private fun pickFiles(): List<File> {
-    val chooser = JFileChooser().apply {
-        isMultiSelectionEnabled = true
-        fileSelectionMode = JFileChooser.FILES_ONLY
+    if (showFilesPicker) {
+        FilePickerDialog(
+            title = "Elegir archivos",
+            mode = FilePickerMode.FILES,
+            allowMultiple = true,
+            extensionFilter = playlistMediaExtensions,
+            onDismiss = { showFilesPicker = false },
+            onConfirm = { files ->
+                selectedFiles = files
+                showFilesPicker = false
+            }
+        )
     }
-    return if (chooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {
-        chooser.selectedFiles.toList()
-    } else emptyList()
-}
-
-private fun pickFolder(): File? {
-    val chooser = JFileChooser().apply {
-        fileSelectionMode = JFileChooser.DIRECTORIES_ONLY
+    if (showFolderPicker) {
+        FilePickerDialog(
+            title = "Elegir carpeta",
+            mode = FilePickerMode.FOLDER,
+            onDismiss = { showFolderPicker = false },
+            onConfirm = { folders ->
+                folders.firstOrNull()?.let { folder ->
+                    selectedFiles = folder.listFiles()?.filter { it.isFile } ?: emptyList()
+                }
+                showFolderPicker = false
+            }
+        )
     }
-    return if (chooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {
-        chooser.selectedFile
-    } else null
 }

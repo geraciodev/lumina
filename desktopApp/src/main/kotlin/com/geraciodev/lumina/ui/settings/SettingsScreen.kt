@@ -51,11 +51,18 @@ import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.PopupProperties
 import com.geraciodev.lumina.ui.MainViewModel
+import com.geraciodev.lumina.ui.filepicker.FilePickerDialog
+import com.geraciodev.lumina.ui.filepicker.FilePickerMode
 import java.awt.event.KeyEvent
 import java.io.File
 
+private val fontFileExtensions = setOf("ttf", "otf")
+
 @Composable
 fun SettingsScreen(viewModel: MainViewModel) {
+    var showScanFolderPicker by remember { mutableStateOf(false) }
+    var showFontFilePicker by remember { mutableStateOf(false) }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -79,17 +86,7 @@ fun SettingsScreen(viewModel: MainViewModel) {
                         description = "Gestionar directorios donde Lumina busca archivos multimedia.",
                         action = {
                             Button(
-                                onClick = {
-                                    val chooser = javax.swing.JFileChooser().apply {
-                                        fileSelectionMode = javax.swing.JFileChooser.DIRECTORIES_ONLY
-                                        dialogTitle = "Seleccionar carpeta de medios"
-                                        approveButtonText = "Seleccionar"
-                                    }
-                                    val result = chooser.showOpenDialog(null)
-                                    if (result == javax.swing.JFileChooser.APPROVE_OPTION) {
-                                        viewModel.addScanFolder(chooser.selectedFile.absolutePath)
-                                    }
-                                },
+                                onClick = { showScanFolderPicker = true },
                                 shape = MaterialTheme.shapes.small
                             ) {
                                 Icon(Icons.Default.Folder, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -268,18 +265,7 @@ fun SettingsScreen(viewModel: MainViewModel) {
                                 }
 
                                 IconButton(
-                                    onClick = {
-                                        val chooser = javax.swing.JFileChooser().apply {
-                                            fileSelectionMode = javax.swing.JFileChooser.FILES_ONLY
-                                            fileFilter = javax.swing.filechooser.FileNameExtensionFilter("Fuentes (TTF, OTF)", "ttf", "otf")
-                                            dialogTitle = "Seleccionar archivo de fuente"
-                                        }
-                                        val result = chooser.showOpenDialog(null)
-                                        if (result == javax.swing.JFileChooser.APPROVE_OPTION) {
-                                            viewModel.settings.projectionFontFamily = chooser.selectedFile.absolutePath
-                                            viewModel.settings.saveCurrentSettings()
-                                        }
-                                    }
+                                    onClick = { showFontFilePicker = true }
                                 ) {
                                     Icon(Icons.Default.Add, contentDescription = "Cargar fuente desde archivo")
                                 }
@@ -348,6 +334,33 @@ fun SettingsScreen(viewModel: MainViewModel) {
                 }
             }
         }
+    }
+
+    if (showScanFolderPicker) {
+        FilePickerDialog(
+            title = "Añadir carpeta de escaneo",
+            mode = FilePickerMode.FOLDER,
+            onDismiss = { showScanFolderPicker = false },
+            onConfirm = { folders ->
+                folders.firstOrNull()?.let { viewModel.addScanFolder(it.absolutePath) }
+                showScanFolderPicker = false
+            }
+        )
+    }
+    if (showFontFilePicker) {
+        FilePickerDialog(
+            title = "Elegir archivo de fuente",
+            mode = FilePickerMode.FILES,
+            extensionFilter = fontFileExtensions,
+            onDismiss = { showFontFilePicker = false },
+            onConfirm = { files ->
+                files.firstOrNull()?.let { file ->
+                    viewModel.settings.projectionFontFamily = file.absolutePath
+                    viewModel.settings.saveCurrentSettings()
+                }
+                showFontFilePicker = false
+            }
+        )
     }
 }
 

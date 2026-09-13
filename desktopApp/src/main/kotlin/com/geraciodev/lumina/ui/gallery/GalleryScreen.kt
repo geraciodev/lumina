@@ -32,7 +32,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -42,15 +45,18 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import com.geraciodev.lumina.data.model.GalleryImage
 import com.geraciodev.lumina.ui.MainViewModel
+import com.geraciodev.lumina.ui.filepicker.FilePickerDialog
+import com.geraciodev.lumina.ui.filepicker.FilePickerMode
 import java.io.File
 import javax.imageio.ImageIO
-import javax.swing.JFileChooser
-import javax.swing.filechooser.FileNameExtensionFilter
+
+private val galleryImageExtensions = setOf("jpg", "jpeg", "png", "bmp", "gif", "webp")
 
 @Composable
 fun GalleryScreen(viewModel: MainViewModel) {
     val images = viewModel.gallery.images
     val activeBackground = viewModel.settings.projectionBackgroundImage
+    var showAddImagesPicker by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -75,10 +81,7 @@ fun GalleryScreen(viewModel: MainViewModel) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Button(
-                onClick = {
-                    val files = pickImages()
-                    if (files.isNotEmpty()) viewModel.gallery.addImages(files)
-                },
+                onClick = { showAddImagesPicker = true },
                 shape = MaterialTheme.shapes.small
             ) {
                 Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -125,6 +128,20 @@ fun GalleryScreen(viewModel: MainViewModel) {
                 }
             }
         }
+    }
+
+    if (showAddImagesPicker) {
+        FilePickerDialog(
+            title = "Añadir imágenes a la galería",
+            mode = FilePickerMode.FILES,
+            allowMultiple = true,
+            extensionFilter = galleryImageExtensions,
+            onDismiss = { showAddImagesPicker = false },
+            onConfirm = { files ->
+                if (files.isNotEmpty()) viewModel.gallery.addImages(files)
+                showAddImagesPicker = false
+            }
+        )
     }
 }
 
@@ -218,16 +235,4 @@ private fun loadThumbnail(path: String): ImageBitmap? {
     } catch (e: Exception) {
         null
     }
-}
-
-private fun pickImages(): List<File> {
-    val chooser = JFileChooser().apply {
-        isMultiSelectionEnabled = true
-        fileSelectionMode = JFileChooser.FILES_ONLY
-        fileFilter = FileNameExtensionFilter("Imágenes (JPG, PNG, BMP, GIF, WEBP)", "jpg", "jpeg", "png", "bmp", "gif", "webp")
-        dialogTitle = "Seleccionar imágenes"
-    }
-    return if (chooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {
-        chooser.selectedFiles.toList()
-    } else emptyList()
 }
