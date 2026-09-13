@@ -93,7 +93,7 @@ class MainViewModel(
                 "Anterior" -> player.playPrevious()
                 "Alternar Sidebar" -> isSidebarExpanded = !isSidebarExpanded
                 "Alternar Proyección" -> player.toggleProjection()
-                "Silenciar" -> VideoManager.toggleMute(!VideoManager.isMuted())
+                "Silenciar" -> VideoManager.toggleMute(!VideoManager.isMuted)
                 "Adelantar 5s" -> VideoManager.skip(5000)
                 "Retroceder 5s" -> VideoManager.skip(-5000)
                 "Subir Volumen" -> VideoManager.updateVolume(VideoManager.currentVolume + 5)

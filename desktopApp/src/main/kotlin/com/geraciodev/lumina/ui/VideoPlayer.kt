@@ -2,9 +2,13 @@ package com.geraciodev.lumina.ui
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.automirrored.filled.VolumeDown
+import androidx.compose.material.icons.automirrored.filled.VolumeOff
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -17,6 +21,7 @@ import androidx.compose.ui.input.pointer.onPointerEvent
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -61,7 +66,7 @@ fun VideoPlayer(
     }
 }
 
-@OptIn(ExperimentalComposeUiApi::class)
+@OptIn(ExperimentalComposeUiApi::class, ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun VideoControls(playerViewModel: PlayerViewModel, modifier: Modifier = Modifier) {
     val isPlaying = VideoManager.isPlaying
@@ -129,14 +134,27 @@ fun VideoControls(playerViewModel: PlayerViewModel, modifier: Modifier = Modifie
                     }
                 }
 
+                val seekBarColors = SliderDefaults.colors(
+                    thumbColor = MaterialTheme.colorScheme.primary,
+                    activeTrackColor = MaterialTheme.colorScheme.primary
+                )
+                val seekBarInteractionSource = remember { MutableInteractionSource() }
                 Slider(
                     value = position,
                     onValueChange = { VideoManager.seekTo(it) },
                     modifier = Modifier.fillMaxWidth().height(20.dp),
-                    colors = SliderDefaults.colors(
-                        thumbColor = MaterialTheme.colorScheme.primary,
-                        activeTrackColor = MaterialTheme.colorScheme.primary
-                    )
+                    colors = seekBarColors,
+                    interactionSource = seekBarInteractionSource,
+                    // Mismo thumb circular y compacto que el control de volumen, en vez del
+                    // pill fino y alargado por defecto de Material3.
+                    thumb = { sliderState ->
+                        SliderDefaults.Thumb(
+                            interactionSource = seekBarInteractionSource,
+                            sliderState = sliderState,
+                            colors = seekBarColors,
+                            thumbSize = DpSize(18.dp, 18.dp)
+                        )
+                    }
                 )
             }
 
@@ -286,14 +304,55 @@ fun VideoControls(playerViewModel: PlayerViewModel, modifier: Modifier = Modifie
 
                     Spacer(Modifier.width(16.dp))
 
-                    // Volume slider
+                    // Control de volumen: botón de mute (con indicador visual real) + slider
+                    // más ancho para que sea más fácil de manipular con precisión, además de
+                    // soporte para la rueda del mouse.
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("Vol: ", color = Color.White, fontSize = 12.sp)
+                        val isMuted = VideoManager.isMuted
+                        IconButton(
+                            onClick = { VideoManager.toggleMute(!VideoManager.isMuted) },
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                imageVector = when {
+                                    isMuted || VideoManager.currentVolume == 0 -> Icons.AutoMirrored.Filled.VolumeOff
+                                    VideoManager.currentVolume < 50 -> Icons.AutoMirrored.Filled.VolumeDown
+                                    else -> Icons.AutoMirrored.Filled.VolumeUp
+                                },
+                                contentDescription = if (isMuted) "Activar sonido" else "Silenciar",
+                                tint = if (isMuted) MaterialTheme.colorScheme.error else Color.White
+                            )
+                        }
+                        val volumeThumbInteractionSource = remember { MutableInteractionSource() }
                         Slider(
                             value = VideoManager.currentVolume.toFloat(),
                             onValueChange = { VideoManager.updateVolume(it.toInt()) },
                             valueRange = 0f..100f,
-                            modifier = Modifier.width(100.dp)
+                            interactionSource = volumeThumbInteractionSource,
+                            // El thumb "pill" por defecto de Material3 es muy fino y alargado
+                            // para agarrarlo con el mouse; lo cambiamos por uno circular y más
+                            // grande, más cómodo de manipular.
+                            thumb = { sliderState ->
+                                SliderDefaults.Thumb(
+                                    interactionSource = volumeThumbInteractionSource,
+                                    sliderState = sliderState,
+                                    thumbSize = DpSize(18.dp, 18.dp)
+                                )
+                            },
+                            modifier = Modifier
+                                .width(140.dp)
+                                .onPointerEvent(PointerEventType.Scroll) { event ->
+                                    val delta = event.changes.first().scrollDelta.y
+                                    if (delta != 0f) {
+                                        VideoManager.updateVolume(VideoManager.currentVolume - (delta * 5).toInt())
+                                    }
+                                }
+                        )
+                        Text(
+                            text = "${VideoManager.currentVolume}%",
+                            color = Color.White,
+                            fontSize = 12.sp,
+                            modifier = Modifier.width(34.dp).padding(start = 4.dp)
                         )
                     }
                 }

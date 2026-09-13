@@ -43,6 +43,8 @@ object VideoManager {
         private set
     var currentVolume by mutableStateOf(100)
         private set
+    var isMuted by mutableStateOf(false)
+        private set
 
     var onVideoFinished: (() -> Unit)? = null
 
@@ -95,7 +97,11 @@ object VideoManager {
         mediaPlayer?.events()?.addMediaPlayerEventListener(object : MediaPlayerEventAdapter() {
             override fun playing(mediaPlayer: MediaPlayer?) {
                 val mediaDuration = mediaPlayer?.status()?.length() ?: 0L
+                // Reafirmar volumen/mute explícitamente: el audio output que crea VLC para
+                // cada nuevo medio puede arrancar con su propio volumen por defecto en vez de
+                // heredar el nuestro, lo que se sentía como que el sonido "se muteaba solo".
                 mediaPlayer?.audio()?.setVolume(currentVolume)
+                mediaPlayer?.audio()?.setMute(isMuted)
                 updateUiState {
                     isPlaying = true
                     duration = mediaDuration
@@ -104,6 +110,10 @@ object VideoManager {
             }
 
             override fun audioDeviceChanged(mediaPlayer: MediaPlayer?, audioDevice: String?) {
+                // Un cambio de dispositivo de audio (p. ej. PulseAudio reasignando el sink)
+                // puede resetear el volumen/mute a nivel nativo sin avisar; lo reafirmamos.
+                mediaPlayer?.audio()?.setVolume(currentVolume)
+                mediaPlayer?.audio()?.setMute(isMuted)
                 updateUiState { updateTracks() }
             }
 
@@ -139,11 +149,12 @@ object VideoManager {
                 }
             }
 
-            override fun volumeChanged(mediaPlayer: MediaPlayer?, volume: Float) {
-                updateUiState {
-                    this@VideoManager.currentVolume = (volume * 100).toInt()
-                }
-            }
+            // Nota: deliberadamente NO escuchamos volumeChanged() para reflejar su valor en
+            // currentVolume. VLC dispara ese evento con valores transitorios y sin acotar al
+            // iniciar cada medio nuevo (a veces 0, a veces >100% si algo mezcla el volumen del
+            // stream con el del sistema), y adoptarlos causaba que el volumen apareciera en 0
+            // al abrir un video o saltara por encima de 100%. currentVolume es responsabilidad
+            // exclusiva de esta app (updateVolume/toggleMute); nunca se sincroniza desde VLC.
         })
 
         val renderCallback = object : RenderCallback {
@@ -221,11 +232,11 @@ object VideoManager {
         videoFrame = null
     }
 
-    fun toggleMute(isMuted: Boolean) {
-        mediaPlayer?.audio()?.setMute(isMuted)
+    fun toggleMute(muted: Boolean) {
+        isMuted = muted
+        mediaPlayer?.audio()?.setMute(muted)
     }
 
-    fun isMuted(): Boolean = mediaPlayer?.audio()?.isMute() ?: false
 
     fun release() {
         onVideoFinished = null

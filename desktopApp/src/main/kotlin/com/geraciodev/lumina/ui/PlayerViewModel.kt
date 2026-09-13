@@ -46,6 +46,12 @@ class PlayerViewModel(private val scope: CoroutineScope) {
     fun selectVideo(file: File, fromPlaylist: Playlist? = null) {
         selectedVideo = file
         isAudioOnly = audioExtensions.contains(file.extension.lowercase())
+        // Él mute es un toggle manual del usuario para la reproducción actual: al elegir un
+        // archivo nuevo (no al repetir el mismo en modo bucle) partimos siempre con sonido,
+        // para que abrir un video nunca "herede" en silencio un mute que ya se te olvidó.
+        if (VideoManager.isMuted) {
+            VideoManager.toggleMute(false)
+        }
         VideoManager.play(file, isAudioOnly)
 
         // Gestionar lista de recientes (mover al principio si ya existe)
