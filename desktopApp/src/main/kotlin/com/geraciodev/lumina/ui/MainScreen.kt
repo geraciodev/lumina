@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.sp
 import java.io.File
 import com.geraciodev.lumina.ui.playlist.PlaylistScreen
 import com.geraciodev.lumina.ui.bible.BibleScreen
+import com.geraciodev.lumina.ui.gallery.GalleryScreen
 import com.geraciodev.lumina.ui.settings.SettingsScreen
 import com.geraciodev.lumina.ui.about.AboutScreen
 
@@ -63,13 +64,14 @@ fun MainScreen(viewModel: MainViewModel) {
                     LuminaScreen.SEARCH -> SearchAndPlayerView(viewModel)
                     LuminaScreen.PLAYLIST -> PlaylistScreen(viewModel)
                     LuminaScreen.BIBLE -> BibleScreen(viewModel)
+                    LuminaScreen.GALLERY -> GalleryScreen(viewModel)
                     LuminaScreen.SETTINGS -> SettingsScreen(viewModel)
                     LuminaScreen.ABOUT -> AboutScreen()
                 }
             }
 
             // Ventana Flotante de Playlist (Mini Sidebar)
-            if (viewModel.isPlaylistWindowOpen && (viewModel.playingPlaylist != null || viewModel.showRecentInOverlay)) {
+            if (viewModel.player.isPlaylistWindowOpen && (viewModel.player.playingPlaylist != null || viewModel.player.showRecentInOverlay)) {
                 PlaylistOverlay(viewModel)
             }
         }
@@ -144,6 +146,14 @@ fun NavigationSidebar(
                 isExpanded = isExpanded
             ) {
                 onScreenSelected(LuminaScreen.BIBLE)
+            }
+            NavIconItem(
+                icon = Icons.Default.Collections,
+                label = "GALERÍA",
+                isSelected = currentScreen == LuminaScreen.GALLERY,
+                isExpanded = isExpanded
+            ) {
+                onScreenSelected(LuminaScreen.GALLERY)
             }
         }
 
@@ -249,8 +259,8 @@ fun SearchAndPlayerView(viewModel: MainViewModel) {
             )
 
             TextField(
-                value = viewModel.searchQuery,
-                onValueChange = { viewModel.onSearchQueryChanged(it) },
+                value = viewModel.search.searchQuery,
+                onValueChange = { viewModel.search.onSearchQueryChanged(it) },
                 modifier = Modifier
                     .fillMaxWidth()
                     .onFocusChanged { viewModel.isAnyInputFocused = it.isFocused },
@@ -264,12 +274,12 @@ fun SearchAndPlayerView(viewModel: MainViewModel) {
                 ),
                 trailingIcon = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        if (viewModel.searchQuery.isNotEmpty()) {
-                            IconButton(onClick = { viewModel.onSearchQueryChanged("") }) {
+                        if (viewModel.search.searchQuery.isNotEmpty()) {
+                            IconButton(onClick = { viewModel.search.onSearchQueryChanged("") }) {
                                 Icon(Icons.Default.Clear, contentDescription = "Limpiar")
                             }
                         }
-                        if (viewModel.isSearching) {
+                        if (viewModel.search.isSearching) {
                             CircularProgressIndicator(
                                 modifier = Modifier.size(20.dp),
                                 strokeWidth = 2.dp
@@ -282,8 +292,8 @@ fun SearchAndPlayerView(viewModel: MainViewModel) {
             Spacer(Modifier.height(24.dp))
 
             LazyColumn(modifier = Modifier.weight(1f)) {
-                items(viewModel.searchResults) { file ->
-                    val isSelected = viewModel.selectedVideo == file
+                items(viewModel.search.searchResults) { file ->
+                    val isSelected = viewModel.player.selectedVideo == file
                     ListItem(
                         headlineContent = {
                             Text(
@@ -302,7 +312,7 @@ fun SearchAndPlayerView(viewModel: MainViewModel) {
                             .clickable {
                                 focusManager.clearFocus()
                                 viewModel.isAnyInputFocused = false
-                                viewModel.selectVideo(file)
+                                viewModel.player.selectVideo(file)
                             }
                             .padding(vertical = 2.dp),
                         colors = ListItemDefaults.colors(
@@ -320,8 +330,8 @@ fun SearchAndPlayerView(viewModel: MainViewModel) {
                 .fillMaxHeight()
                 .padding(start = 12.dp, top = 24.dp, end = 24.dp, bottom = 24.dp)
         ) {
-            if (viewModel.selectedVideo != null) {
-                if (viewModel.isAudioOnly) {
+            if (viewModel.player.selectedVideo != null) {
+                if (viewModel.player.isAudioOnly) {
                     // Vista específica para Audio
                     Box(
                         modifier = Modifier
@@ -341,7 +351,7 @@ fun SearchAndPlayerView(viewModel: MainViewModel) {
                             )
                             Spacer(Modifier.height(48.dp))
                             VideoControls(
-                                viewModel = viewModel,
+                                playerViewModel = viewModel.player,
                                 modifier = Modifier.fillMaxWidth()
                             )
                         }
@@ -355,7 +365,7 @@ fun SearchAndPlayerView(viewModel: MainViewModel) {
                             .background(Color.Black)
                     ) {
                         VideoPlayer(
-                            viewModel = viewModel,
+                            playerViewModel = viewModel.player,
                             modifier = Modifier.fillMaxSize(),
                             showControls = true,
                             isAudioOnly = false
@@ -372,43 +382,43 @@ fun SearchAndPlayerView(viewModel: MainViewModel) {
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = viewModel.selectedVideo?.name ?: "",
+                            text = viewModel.player.selectedVideo?.name ?: "",
                             style = MaterialTheme.typography.titleMedium
                         )
                         Text(
-                            text = viewModel.selectedVideo?.absolutePath ?: "",
+                            text = viewModel.player.selectedVideo?.absolutePath ?: "",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.secondary
                         )
                     }
 
-                    if (!viewModel.isAudioOnly) {
+                    if (!viewModel.player.isAudioOnly) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            if (viewModel.playingPlaylist != null || viewModel.showRecentInOverlay) {
+                            if (viewModel.player.playingPlaylist != null || viewModel.player.showRecentInOverlay) {
                                 IconButton(
                                     onClick = {
-                                        viewModel.isPlaylistWindowOpen =
-                                            !viewModel.isPlaylistWindowOpen
+                                        viewModel.player.isPlaylistWindowOpen =
+                                            !viewModel.player.isPlaylistWindowOpen
                                     },
                                     modifier = Modifier.padding(end = 8.dp)
                                 ) {
                                     Icon(
                                         Icons.AutoMirrored.Filled.PlaylistPlay,
                                         contentDescription = "Ver Playlist",
-                                        tint = if (viewModel.isPlaylistWindowOpen) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
+                                        tint = if (viewModel.player.isPlaylistWindowOpen) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
                                     )
                                 }
                             }
-                            TextButton(onClick = { 
+                            TextButton(onClick = {
                                 focusManager.clearFocus()
-                                viewModel.stopVideo() 
+                                viewModel.player.stopVideo()
                             }) {
                                 Text("DETENER", color = MaterialTheme.colorScheme.error)
                             }
                             Button(
-                                onClick = { 
+                                onClick = {
                                     focusManager.clearFocus()
-                                    viewModel.toggleProjection() 
+                                    viewModel.player.toggleProjection()
                                 },
                                 contentPadding = PaddingValues(
                                     horizontal = 24.dp,
@@ -417,30 +427,30 @@ fun SearchAndPlayerView(viewModel: MainViewModel) {
                                 shape = MaterialTheme.shapes.small
                             ) {
                                 Text(
-                                    if (viewModel.projectingFile != null) "DETENER PROYECCIÓN" else "PROYECTAR",
+                                    if (viewModel.player.projectingFile != null) "DETENER PROYECCIÓN" else "PROYECTAR",
                                     style = MaterialTheme.typography.labelLarge
                                 )
                             }
                         }
                     } else {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            if (viewModel.playingPlaylist != null || viewModel.showRecentInOverlay) {
+                            if (viewModel.player.playingPlaylist != null || viewModel.player.showRecentInOverlay) {
                                 IconButton(
                                     onClick = {
-                                        viewModel.isPlaylistWindowOpen =
-                                            !viewModel.isPlaylistWindowOpen
+                                        viewModel.player.isPlaylistWindowOpen =
+                                            !viewModel.player.isPlaylistWindowOpen
                                     }
                                 ) {
                                     Icon(
                                         Icons.AutoMirrored.Filled.PlaylistPlay,
                                         contentDescription = "Ver Playlist",
-                                        tint = if (viewModel.isPlaylistWindowOpen) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
+                                        tint = if (viewModel.player.isPlaylistWindowOpen) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
                                     )
                                 }
                             }
-                            TextButton(onClick = { 
+                            TextButton(onClick = {
                                 focusManager.clearFocus()
-                                viewModel.stopVideo() 
+                                viewModel.player.stopVideo()
                             }) {
                                 Text("DETENER", color = MaterialTheme.colorScheme.error)
                             }
@@ -466,10 +476,10 @@ fun SearchAndPlayerView(viewModel: MainViewModel) {
 @Composable
 fun PlaylistOverlay(viewModel: MainViewModel) {
     val items =
-        if (viewModel.showRecentInOverlay) viewModel.recentFiles else viewModel.playingPlaylist?.items
+        if (viewModel.player.showRecentInOverlay) viewModel.player.recentFiles else viewModel.player.playingPlaylist?.items
             ?: emptyList()
     val title =
-        if (viewModel.showRecentInOverlay) "RECIENTES" else viewModel.playingPlaylist?.name ?: ""
+        if (viewModel.player.showRecentInOverlay) "RECIENTES" else viewModel.player.playingPlaylist?.name ?: ""
 
     Box(
         modifier = Modifier
@@ -489,7 +499,7 @@ fun PlaylistOverlay(viewModel: MainViewModel) {
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.primary
                 )
-                IconButton(onClick = { viewModel.isPlaylistWindowOpen = false }) {
+                IconButton(onClick = { viewModel.player.isPlaylistWindowOpen = false }) {
                     Icon(Icons.Default.Close, contentDescription = "Cerrar")
                 }
             }
@@ -498,7 +508,7 @@ fun PlaylistOverlay(viewModel: MainViewModel) {
 
             LazyColumn(modifier = Modifier.fillMaxSize()) {
                 items(items) { item ->
-                    val isPlaying = viewModel.selectedVideo?.absolutePath == item.filePath
+                    val isPlaying = viewModel.player.selectedVideo?.absolutePath == item.filePath
                     ListItem(
                         headlineContent = {
                             Text(
@@ -511,9 +521,9 @@ fun PlaylistOverlay(viewModel: MainViewModel) {
                             val file = File(item.filePath)
                             if (file.exists()) {
                                 // Si estamos en modo recientes, mantenemos el modo recientes al seleccionar
-                                viewModel.selectVideo(
+                                viewModel.player.selectVideo(
                                     file,
-                                    if (viewModel.showRecentInOverlay) null else viewModel.playingPlaylist
+                                    if (viewModel.player.showRecentInOverlay) null else viewModel.player.playingPlaylist
                                 )
                             }
                         },

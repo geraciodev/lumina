@@ -1,5 +1,6 @@
 package com.geraciodev.lumina.ui.bible
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,6 +18,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -26,7 +29,9 @@ import com.geraciodev.lumina.data.model.bible.BibleItem
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.platform.Font
+import androidx.compose.ui.graphics.toComposeImageBitmap
 import java.io.File
+import javax.imageio.ImageIO
 
 @OptIn(androidx.compose.ui.text.ExperimentalTextApi::class)
 @Composable
@@ -35,8 +40,13 @@ fun BibleProjectionView(
     reference: String,
     fontSize: Int = 48,
     fontFamily: String = "Inter",
-    fontColor: Long = 0xFFFFFFFFL
+    fontColor: Long = 0xFFFFFFFFL,
+    backgroundImagePath: String? = null
 ) {
+    val backgroundBitmap = remember(backgroundImagePath) {
+        loadBackgroundBitmap(backgroundImagePath)
+    }
+
     // Intentamos cargar la fuente de forma robusta para Skia
     val customFontFamily = remember(fontFamily) {
         try {
@@ -62,6 +72,21 @@ fun BibleProjectionView(
             .background(Color.Black),
         contentAlignment = Alignment.Center
     ) {
+        if (backgroundBitmap != null) {
+            Image(
+                bitmap = backgroundBitmap,
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
+            // Velo oscuro para que el texto siga siendo legible sobre cualquier imagen.
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.45f))
+            )
+        }
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -116,5 +141,17 @@ fun BibleProjectionView(
                 )
             }
         }
+    }
+}
+
+private fun loadBackgroundBitmap(path: String?): ImageBitmap? {
+    if (path.isNullOrBlank()) return null
+    return try {
+        val file = File(path)
+        if (!file.exists()) return null
+        ImageIO.read(file)?.toComposeImageBitmap()
+    } catch (e: Exception) {
+        println("Error cargando imagen de fondo $path: ${e.message}")
+        null
     }
 }

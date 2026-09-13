@@ -13,7 +13,8 @@ data class AppSettings(
     val scanFolders: List<String> = emptyList(),
     val projectionFontSize: Int = 48,
     val projectionFontFamily: String = "Inter",
-    val projectionFontColor: Long = 0xFFFFFFFFL // White
+    val projectionFontColor: Long = 0xFFFFFFFFL, // White
+    val projectionBackgroundImage: String? = null
 )
 
 @Serializable

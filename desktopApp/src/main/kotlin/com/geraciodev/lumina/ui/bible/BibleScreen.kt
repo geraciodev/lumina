@@ -26,22 +26,22 @@ import com.geraciodev.lumina.ui.MainViewModel
 @Composable
 fun BibleScreen(viewModel: MainViewModel) {
     val focusManager = LocalFocusManager.current
-    val bible = viewModel.bibleVersion
-    val selectedBook = viewModel.selectedBibleBook
-    val selectedChapter = viewModel.selectedBibleChapter
-    val selectedVerses = viewModel.selectedVerses
-    
+    val bible = viewModel.bible.bibleVersion
+    val selectedBook = viewModel.bible.selectedBibleBook
+    val selectedChapter = viewModel.bible.selectedBibleChapter
+    val selectedVerses = viewModel.bible.selectedVerses
+
     val bibleListState = rememberLazyListState()
 
-    LaunchedEffect(viewModel.scrollToVerseIndex) {
-        viewModel.scrollToVerseIndex?.let { index ->
+    LaunchedEffect(viewModel.bible.scrollToVerseIndex) {
+        viewModel.bible.scrollToVerseIndex?.let { index ->
             bibleListState.animateScrollToItem(index)
-            viewModel.scrollToVerseIndex = null
+            viewModel.bible.scrollToVerseIndex = null
         }
     }
 
     LaunchedEffect(selectedChapter) {
-        if (viewModel.scrollToVerseIndex == null) {
+        if (viewModel.bible.scrollToVerseIndex == null) {
             bibleListState.scrollToItem(0)
         }
     }
@@ -68,8 +68,8 @@ fun BibleScreen(viewModel: MainViewModel) {
             )
 
             TextField(
-                value = viewModel.bibleSearchQuery,
-                onValueChange = { viewModel.onBibleSearchQueryChanged(it) },
+                value = viewModel.bible.bibleSearchQuery,
+                onValueChange = { viewModel.bible.onBibleSearchQueryChanged(it) },
                 modifier = Modifier
                     .fillMaxWidth()
                     .onFocusChanged { viewModel.isAnyInputFocused = it.isFocused },
@@ -83,12 +83,12 @@ fun BibleScreen(viewModel: MainViewModel) {
                 ),
                 trailingIcon = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        if (viewModel.bibleSearchQuery.isNotEmpty()) {
-                            IconButton(onClick = { viewModel.onBibleSearchQueryChanged("") }) {
+                        if (viewModel.bible.bibleSearchQuery.isNotEmpty()) {
+                            IconButton(onClick = { viewModel.bible.onBibleSearchQueryChanged("") }) {
                                 Icon(Icons.Default.Clear, contentDescription = "Limpiar")
                             }
                         }
-                        if (viewModel.isBibleSearching) {
+                        if (viewModel.bible.isBibleSearching) {
                             CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
                         } else {
                             Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(20.dp))
@@ -99,23 +99,23 @@ fun BibleScreen(viewModel: MainViewModel) {
 
             Spacer(Modifier.height(24.dp))
 
-            if (viewModel.bibleSearchQuery.length >= 3) {
+            if (viewModel.bible.bibleSearchQuery.length >= 3) {
                 // Resultados de Búsqueda
                 Text(
-                    text = "RESULTADOS (${viewModel.bibleSearchResults.size})",
+                    text = "RESULTADOS (${viewModel.bible.bibleSearchResults.size})",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(bottom = 8.dp)
                 )
                 LazyColumn(modifier = Modifier.weight(1f)) {
-                    items(viewModel.bibleSearchResults) { result ->
+                    items(viewModel.bible.bibleSearchResults) { result ->
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable {
                                     focusManager.clearFocus()
                                     viewModel.isAnyInputFocused = false
-                                    viewModel.navigateToSearchResult(result)
+                                    viewModel.bible.navigateToSearchResult(result)
                                 }
                                 .padding(vertical = 8.dp, horizontal = 4.dp)
                         ) {
@@ -150,10 +150,10 @@ fun BibleScreen(viewModel: MainViewModel) {
                                     )
                                 },
                                 modifier = Modifier
-                                    .clickable { 
+                                    .clickable {
                                         focusManager.clearFocus()
                                         viewModel.isAnyInputFocused = false
-                                        viewModel.selectBibleBook(book) 
+                                        viewModel.bible.selectBibleBook(book)
                                     }
                                     .padding(vertical = 2.dp),
                                 colors = ListItemDefaults.colors(
@@ -180,10 +180,10 @@ fun BibleScreen(viewModel: MainViewModel) {
                                         .aspectRatio(1f)
                                         .padding(2.dp)
                                         .background(if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent)
-                                        .clickable { 
+                                        .clickable {
                                             focusManager.clearFocus()
                                             viewModel.isAnyInputFocused = false
-                                            viewModel.selectBibleChapter(chapter) 
+                                            viewModel.bible.selectBibleChapter(chapter)
                                         },
                                     contentAlignment = Alignment.Center
                                 ) {
@@ -244,9 +244,9 @@ fun BibleScreen(viewModel: MainViewModel) {
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .clickable { 
+                                        .clickable {
                                             focusManager.clearFocus()
-                                            viewModel.toggleVerseSelection(verseNum) 
+                                            viewModel.bible.toggleVerseSelection(verseNum)
                                         }
                                         .background(if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.1f) else Color.Transparent)
                                         .padding(vertical = 8.dp, horizontal = 4.dp)
@@ -300,7 +300,7 @@ fun BibleScreen(viewModel: MainViewModel) {
                 }
 
                 Row {
-                    if (viewModel.projectingBibleVerses != null) {
+                    if (viewModel.bible.projectingBibleVerses != null) {
                         TextButton(
                             onClick = { 
                                 focusManager.clearFocus()

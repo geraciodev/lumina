@@ -64,17 +64,17 @@ fun PlaylistScreen(viewModel: MainViewModel) {
             Spacer(Modifier.height(16.dp))
 
             LazyColumn(modifier = Modifier.fillMaxSize()) {
-                items(viewModel.playlists) { playlist ->
-                    val isSelected = viewModel.selectedPlaylist?.id == playlist.id
+                items(viewModel.playlist.playlists) { playlist ->
+                    val isSelected = viewModel.playlist.selectedPlaylist?.id == playlist.id
                     ListItem(
                         headlineContent = { Text(playlist.name) },
                         supportingContent = { Text("${playlist.items.size} archivos") },
-                        modifier = Modifier.clickable { viewModel.selectedPlaylist = playlist },
+                        modifier = Modifier.clickable { viewModel.playlist.selectedPlaylist = playlist },
                         colors = ListItemDefaults.colors(
                             containerColor = if (isSelected) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent
                         ),
                         trailingContent = {
-                            IconButton(onClick = { viewModel.deletePlaylist(playlist) }) {
+                            IconButton(onClick = { viewModel.playlist.deletePlaylist(playlist) }) {
                                 Icon(Icons.Default.Delete, contentDescription = "Eliminar", modifier = Modifier.size(20.dp))
                             }
                         }
@@ -98,7 +98,7 @@ fun PlaylistScreen(viewModel: MainViewModel) {
                 .fillMaxHeight()
                 .padding(24.dp)
         ) {
-            val selected = viewModel.selectedPlaylist
+            val selected = viewModel.playlist.selectedPlaylist
             if (selected != null) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -110,19 +110,19 @@ fun PlaylistScreen(viewModel: MainViewModel) {
                         style = MaterialTheme.typography.headlineSmall,
                         color = MaterialTheme.colorScheme.primary
                     )
-                    
+
                     Row {
-                        IconButton(onClick = { 
+                        IconButton(onClick = {
                             val files = pickFiles()
-                            if (files.isNotEmpty()) viewModel.addFilesToPlaylist(selected, files)
+                            if (files.isNotEmpty()) viewModel.playlist.addFilesToPlaylist(selected, files)
                         }) {
                             Icon(Icons.Default.UploadFile, contentDescription = "Añadir archivos")
                         }
-                        IconButton(onClick = { 
+                        IconButton(onClick = {
                             val folder = pickFolder()
                             if (folder != null) {
-                                val files = viewModel.loadFilesFromFolder(folder)
-                                viewModel.addFilesToPlaylist(selected, files)
+                                val files = viewModel.playlist.loadFilesFromFolder(folder)
+                                viewModel.playlist.addFilesToPlaylist(selected, files)
                             }
                         }) {
                             Icon(Icons.Default.CreateNewFolder, contentDescription = "Añadir carpeta")
@@ -171,22 +171,22 @@ fun PlaylistScreen(viewModel: MainViewModel) {
                         ListItem(
                             headlineContent = { Text(item.fileName) },
                             supportingContent = { Text(item.filePath, style = MaterialTheme.typography.labelSmall) },
-                            modifier = Modifier.clickable { 
+                            modifier = Modifier.clickable {
                                 val file = File(item.filePath)
                                 if (file.exists()) {
-                                    viewModel.selectVideo(file, selected)
+                                    viewModel.player.selectVideo(file, selected)
                                     viewModel.currentScreen = com.geraciodev.lumina.ui.LuminaScreen.SEARCH
                                 }
                             },
                             leadingContent = {
                                 Icon(
-                                    imageVector = if (item.fileName.endsWith(".mp3") || item.fileName.endsWith(".wav")) 
+                                    imageVector = if (item.fileName.endsWith(".mp3") || item.fileName.endsWith(".wav"))
                                         Icons.Default.MusicNote else Icons.Default.Movie,
                                     contentDescription = null
                                 )
                             },
                             trailingContent = {
-                                IconButton(onClick = { viewModel.removeItemFromPlaylist(selected, item) }) {
+                                IconButton(onClick = { viewModel.playlist.removeItemFromPlaylist(selected, item) }) {
                                     Icon(Icons.Default.RemoveCircleOutline, contentDescription = "Quitar de la playlist", modifier = Modifier.size(20.dp))
                                 }
                             }
@@ -205,7 +205,7 @@ fun PlaylistScreen(viewModel: MainViewModel) {
         CreatePlaylistDialog(
             onDismiss = { showCreateDialog = false },
             onCreate = { name, files ->
-                viewModel.createPlaylist(name, files)
+                viewModel.playlist.createPlaylist(name, files)
                 showCreateDialog = false
             },
             onFocusChanged = { viewModel.isAnyInputFocused = it }

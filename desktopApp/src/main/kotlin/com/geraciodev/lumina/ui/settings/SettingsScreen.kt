@@ -99,9 +99,9 @@ fun SettingsScreen(viewModel: MainViewModel) {
                         }
                     )
                     
-                    if (viewModel.scanFolders.isNotEmpty()) {
+                    if (viewModel.settings.scanFolders.isNotEmpty()) {
                         Spacer(Modifier.height(8.dp))
-                        viewModel.scanFolders.forEach { path ->
+                        viewModel.settings.scanFolders.forEach { path ->
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -146,8 +146,8 @@ fun SettingsScreen(viewModel: MainViewModel) {
                         description = "Forzar tema oscuro en toda la aplicación.",
                         action = {
                             Switch(
-                                checked = viewModel.isDarkMode,
-                                onCheckedChange = { viewModel.toggleDarkMode(it) }
+                                checked = viewModel.settings.isDarkMode,
+                                onCheckedChange = { viewModel.settings.toggleDarkMode(it) }
                             )
                         }
                     )
@@ -168,14 +168,12 @@ fun SettingsScreen(viewModel: MainViewModel) {
 
                     SettingsItem(
                         title = "Tamaño de fuente",
-                        description = "Ajustar el tamaño del texto en la proyección (${viewModel.projectionFontSize}sp).",
+                        description = "Ajustar el tamaño del texto en la proyección (${viewModel.settings.projectionFontSize}sp).",
                         action = {
                             Slider(
-                                value = viewModel.projectionFontSize.toFloat(),
-                                onValueChange = { 
-                                    viewModel.projectionFontSize = it.toInt()
-                                    viewModel.saveCurrentSettings()
-                                },
+                                value = viewModel.settings.projectionFontSize.toFloat(),
+                                onValueChange = { viewModel.settings.projectionFontSize = it.toInt() },
+                                onValueChangeFinished = { viewModel.settings.saveCurrentSettings() },
                                 valueRange = 20f..120f,
                                 modifier = Modifier.width(150.dp)
                             )
@@ -183,9 +181,9 @@ fun SettingsScreen(viewModel: MainViewModel) {
                     )
 
                     var fontMenuExpanded by remember { mutableStateOf(false) }
-                    var fontSearchQuery by remember(viewModel.projectionFontFamily) {
-                        val file = File(viewModel.projectionFontFamily)
-                        mutableStateOf(if (file.exists() && file.isFile) file.name else viewModel.projectionFontFamily)
+                    var fontSearchQuery by remember(viewModel.settings.projectionFontFamily) {
+                        val file = File(viewModel.settings.projectionFontFamily)
+                        mutableStateOf(if (file.exists() && file.isFile) file.name else viewModel.settings.projectionFontFamily)
                     }
 
                     SettingsItem(
@@ -244,7 +242,7 @@ fun SettingsScreen(viewModel: MainViewModel) {
                                         properties = PopupProperties(focusable = false),
                                         modifier = Modifier.heightIn(max = 400.dp).width(240.dp)
                                     ) {
-                                        val filtered = viewModel.availableSystemFonts.filterNotNull().filter {
+                                        val filtered = viewModel.settings.availableSystemFonts.filterNotNull().filter {
                                             it.contains(fontSearchQuery, ignoreCase = true)
                                         }.take(50)
 
@@ -258,9 +256,9 @@ fun SettingsScreen(viewModel: MainViewModel) {
                                                 DropdownMenuItem(
                                                     text = { Text(fontName, style = MaterialTheme.typography.bodySmall) },
                                                     onClick = {
-                                                        viewModel.projectionFontFamily = fontName
+                                                        viewModel.settings.projectionFontFamily = fontName
                                                         fontSearchQuery = fontName
-                                                        viewModel.saveCurrentSettings()
+                                                        viewModel.settings.saveCurrentSettings()
                                                         fontMenuExpanded = false
                                                     }
                                                 )
@@ -278,8 +276,8 @@ fun SettingsScreen(viewModel: MainViewModel) {
                                         }
                                         val result = chooser.showOpenDialog(null)
                                         if (result == javax.swing.JFileChooser.APPROVE_OPTION) {
-                                            viewModel.projectionFontFamily = chooser.selectedFile.absolutePath
-                                            viewModel.saveCurrentSettings()
+                                            viewModel.settings.projectionFontFamily = chooser.selectedFile.absolutePath
+                                            viewModel.settings.saveCurrentSettings()
                                         }
                                     }
                                 ) {
@@ -304,13 +302,13 @@ fun SettingsScreen(viewModel: MainViewModel) {
                                     Canvas(
                                         modifier = Modifier
                                             .clickable {
-                                                viewModel.projectionFontColor = colorValue
-                                                viewModel.saveCurrentSettings()
+                                                viewModel.settings.projectionFontColor = colorValue
+                                                viewModel.settings.saveCurrentSettings()
                                             }
                                             .size(24.dp)
                                             .border(
                                                 width = 1.dp,
-                                                color = if (viewModel.projectionFontColor == colorValue) 
+                                                color = if (viewModel.settings.projectionFontColor == colorValue)
                                                     MaterialTheme.colorScheme.primary 
                                                 else 
                                                     MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f),
@@ -329,14 +327,14 @@ fun SettingsScreen(viewModel: MainViewModel) {
 
             item {
                 SettingsSection(title = "ATAJOS DE TECLADO") {
-                    viewModel.shortcuts.forEach { (name, config) ->
-                        val isRecording = viewModel.recordingShortcutName == name
+                    viewModel.settings.shortcuts.forEach { (name, config) ->
+                        val isRecording = viewModel.settings.recordingShortcutName == name
                         SettingsItem(
                             title = name,
                             description = if (isRecording) "Presiona una tecla..." else formatShortcut(config),
                             action = {
                                 Button(
-                                    onClick = { viewModel.recordingShortcutName = name },
+                                    onClick = { viewModel.settings.recordingShortcutName = name },
                                     colors = if (isRecording) ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error) else ButtonDefaults.buttonColors(),
                                     shape = MaterialTheme.shapes.small
                                 ) {

@@ -9,6 +9,7 @@ import androidx.compose.ui.window.*
 import com.geraciodev.lumina.data.VideoSearchRepository
 import com.geraciodev.lumina.data.PlaylistRepository
 import com.geraciodev.lumina.data.BibleRepository
+import com.geraciodev.lumina.data.GalleryRepository
 import androidx.compose.ui.input.key.*
 import com.geraciodev.lumina.data.SettingsRepository
 import com.geraciodev.lumina.data.model.ShortcutConfig
@@ -27,27 +28,28 @@ fun main() = application {
     val playlistRepository = remember { PlaylistRepository() }
     val bibleRepository = remember { BibleRepository() }
     val settingsRepository = remember { SettingsRepository() }
-    val viewModel = remember { 
-        MainViewModel(repository, playlistRepository, bibleRepository, settingsRepository, scope) 
+    val galleryRepository = remember { GalleryRepository() }
+    val viewModel = remember {
+        MainViewModel(repository, playlistRepository, bibleRepository, settingsRepository, galleryRepository, scope)
     }
     
     val windowState = rememberWindowState(
-        placement = if (viewModel.isMaximized) WindowPlacement.Maximized else WindowPlacement.Floating,
+        placement = if (viewModel.settings.isMaximized) WindowPlacement.Maximized else WindowPlacement.Floating,
         position = WindowPosition.PlatformDefault,
-        width = viewModel.windowWidth.dp,
-        height = viewModel.windowHeight.dp
+        width = viewModel.settings.windowWidth.dp,
+        height = viewModel.settings.windowHeight.dp
     )
 
     // Ventana Principal
     Window(
         onCloseRequest = {
             // Guardar estado actual antes de cerrar
-            viewModel.isMaximized = windowState.placement == WindowPlacement.Maximized
-            if (!viewModel.isMaximized) {
-                viewModel.windowWidth = windowState.size.width.value.toInt()
-                viewModel.windowHeight = windowState.size.height.value.toInt()
+            viewModel.settings.isMaximized = windowState.placement == WindowPlacement.Maximized
+            if (!viewModel.settings.isMaximized) {
+                viewModel.settings.windowWidth = windowState.size.width.value.toInt()
+                viewModel.settings.windowHeight = windowState.size.height.value.toInt()
             }
-            viewModel.saveCurrentSettings()
+            viewModel.settings.saveCurrentSettings()
             VideoManager.release()
             exitApplication()
         },
@@ -56,9 +58,9 @@ fun main() = application {
         undecorated = true,
         onPreviewKeyEvent = { keyEvent ->
             if (keyEvent.type == KeyEventType.KeyDown) {
-                val recordingName = viewModel.recordingShortcutName
+                val recordingName = viewModel.settings.recordingShortcutName
                 if (recordingName != null) {
-                    viewModel.updateShortcut(
+                    viewModel.settings.updateShortcut(
                         recordingName,
                         ShortcutConfig(
                             keyCode = keyEvent.key.nativeKeyCode,
@@ -67,7 +69,7 @@ fun main() = application {
                             shift = keyEvent.isShiftPressed
                         )
                     )
-                    viewModel.recordingShortcutName = null
+                    viewModel.settings.recordingShortcutName = null
                     true
                 } else if (viewModel.isAnyInputFocused) {
                     false
@@ -82,7 +84,7 @@ fun main() = application {
             } else false
         }
     ) {
-        LuminaTheme(darkTheme = viewModel.isDarkMode) {
+        LuminaTheme(darkTheme = viewModel.settings.isDarkMode) {
             Column(modifier = Modifier.fillMaxSize()) {
                 WindowTitleBar(
                     title = "Lumina - Reproductor Multimedia",
@@ -96,12 +98,12 @@ fun main() = application {
                         }
                     },
                     onClose = {
-                        viewModel.isMaximized = windowState.placement == WindowPlacement.Maximized
-                        if (!viewModel.isMaximized) {
-                            viewModel.windowWidth = windowState.size.width.value.toInt()
-                            viewModel.windowHeight = windowState.size.height.value.toInt()
+                        viewModel.settings.isMaximized = windowState.placement == WindowPlacement.Maximized
+                        if (!viewModel.settings.isMaximized) {
+                            viewModel.settings.windowWidth = windowState.size.width.value.toInt()
+                            viewModel.settings.windowHeight = windowState.size.height.value.toInt()
                         }
-                        viewModel.saveCurrentSettings()
+                        viewModel.settings.saveCurrentSettings()
                         VideoManager.release()
                         exitApplication()
                     }
@@ -112,8 +114,8 @@ fun main() = application {
     }
 
     // Ventana de Proyección (Segunda Pantalla)
-    val projectingFile = viewModel.projectingFile
-    val projectingBibleVerses = viewModel.projectingBibleVerses
+    val projectingFile = viewModel.player.projectingFile
+    val projectingBibleVerses = viewModel.bible.projectingBibleVerses
     
     if (projectingFile != null || projectingBibleVerses != null) {
         val screens = GraphicsEnvironment.getLocalGraphicsEnvironment().screenDevices
@@ -140,17 +142,18 @@ fun main() = application {
 
             if (projectingFile != null) {
                 VideoPlayer(
-                    viewModel = viewModel,
+                    playerViewModel = viewModel.player,
                     modifier = Modifier.fillMaxSize(),
-                    isAudioOnly = viewModel.isAudioOnly
+                    isAudioOnly = viewModel.player.isAudioOnly
                 )
             } else if (projectingBibleVerses != null) {
                 BibleProjectionView(
                     verses = projectingBibleVerses,
-                    reference = viewModel.projectingBibleRef,
-                    fontSize = viewModel.projectionFontSize,
-                    fontFamily = viewModel.projectionFontFamily,
-                    fontColor = viewModel.projectionFontColor
+                    reference = viewModel.bible.projectingBibleRef,
+                    fontSize = viewModel.settings.projectionFontSize,
+                    fontFamily = viewModel.settings.projectionFontFamily,
+                    fontColor = viewModel.settings.projectionFontColor,
+                    backgroundImagePath = viewModel.settings.projectionBackgroundImage
                 )
             }
         }

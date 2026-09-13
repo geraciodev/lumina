@@ -26,7 +26,7 @@ import kotlin.math.roundToInt
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun VideoPlayer(
-    viewModel: MainViewModel,
+    playerViewModel: PlayerViewModel,
     modifier: Modifier = Modifier,
     showControls: Boolean = false,
     isAudioOnly: Boolean = false
@@ -54,7 +54,7 @@ fun VideoPlayer(
 
         if (showControls) {
             VideoControls(
-                viewModel = viewModel,
+                playerViewModel = playerViewModel,
                 modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(16.dp)
             )
         }
@@ -63,7 +63,7 @@ fun VideoPlayer(
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-fun VideoControls(viewModel: MainViewModel, modifier: Modifier = Modifier) {
+fun VideoControls(playerViewModel: PlayerViewModel, modifier: Modifier = Modifier) {
     val isPlaying = VideoManager.isPlaying
     val position = VideoManager.currentPosition
     val currentTime = VideoManager.currentTime
@@ -72,7 +72,7 @@ fun VideoControls(viewModel: MainViewModel, modifier: Modifier = Modifier) {
     val subtitleTracks = VideoManager.subtitleTracks
     val currentAudio = VideoManager.currentAudioTrack
     val currentSubs = VideoManager.currentSubtitleTrack
-    val playbackMode = viewModel.playbackMode
+    val playbackMode = playerViewModel.playbackMode
 
     var showAudioMenu by remember { mutableStateOf(false) }
     var showSubsMenu by remember { mutableStateOf(false) }
@@ -146,7 +146,7 @@ fun VideoControls(viewModel: MainViewModel, modifier: Modifier = Modifier) {
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = { viewModel.playPrevious() }) {
+                    IconButton(onClick = { playerViewModel.playPrevious() }) {
                         Icon(Icons.Filled.SkipPrevious, "Anterior", tint = Color.White)
                     }
 
@@ -158,11 +158,11 @@ fun VideoControls(viewModel: MainViewModel, modifier: Modifier = Modifier) {
                         )
                     }
 
-                    IconButton(onClick = { viewModel.stopVideo() }) {
+                    IconButton(onClick = { playerViewModel.stopVideo() }) {
                         Icon(Icons.Filled.Stop, "Detener", tint = Color.White)
                     }
 
-                    IconButton(onClick = { viewModel.playNext() }) {
+                    IconButton(onClick = { playerViewModel.playNext() }) {
                         Icon(Icons.Filled.SkipNext, "Siguiente", tint = Color.White)
                     }
 
@@ -177,7 +177,7 @@ fun VideoControls(viewModel: MainViewModel, modifier: Modifier = Modifier) {
                     Spacer(Modifier.width(16.dp))
 
                     // Botón de Modo de Reproducción
-                    IconButton(onClick = { viewModel.togglePlaybackMode() }) {
+                    IconButton(onClick = { playerViewModel.togglePlaybackMode() }) {
                         val icon = when (playbackMode) {
                             PlaybackMode.LOOP_ONE -> Icons.Default.RepeatOne
                             PlaybackMode.LOOP_ALL -> Icons.Default.Repeat
