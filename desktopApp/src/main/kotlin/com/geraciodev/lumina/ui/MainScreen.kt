@@ -308,6 +308,9 @@ fun SearchAndPlayerView(viewModel: MainViewModel) {
                                 style = MaterialTheme.typography.labelSmall
                             )
                         },
+                        leadingContent = {
+                            MediaThumbnail(file, modifier = Modifier.size(40.dp))
+                        },
                         modifier = Modifier
                             .clickable {
                                 focusManager.clearFocus()

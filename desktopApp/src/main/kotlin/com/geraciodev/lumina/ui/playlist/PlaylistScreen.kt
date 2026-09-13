@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.geraciodev.lumina.data.model.Playlist
 import com.geraciodev.lumina.ui.MainViewModel
+import com.geraciodev.lumina.ui.MediaThumbnail
 import com.geraciodev.lumina.ui.filepicker.FilePickerDialog
 import com.geraciodev.lumina.ui.filepicker.FilePickerMode
 import java.io.File
@@ -178,11 +179,7 @@ fun PlaylistScreen(viewModel: MainViewModel) {
                                 }
                             },
                             leadingContent = {
-                                Icon(
-                                    imageVector = if (item.fileName.endsWith(".mp3") || item.fileName.endsWith(".wav"))
-                                        Icons.Default.MusicNote else Icons.Default.Movie,
-                                    contentDescription = null
-                                )
+                                MediaThumbnail(File(item.filePath), modifier = Modifier.size(40.dp))
                             },
                             trailingContent = {
                                 IconButton(onClick = { viewModel.playlist.removeItemFromPlaylist(selected, item) }) {

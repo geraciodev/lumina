@@ -1,10 +1,16 @@
 package com.geraciodev.lumina.ui.filepicker
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
@@ -12,9 +18,11 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.FontDownload
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -40,6 +48,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.geraciodev.lumina.ui.MediaThumbnail
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -173,7 +182,7 @@ fun FilePickerDialog(
 
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(
-            modifier = Modifier.width(760.dp).height(560.dp),
+            modifier = Modifier.width(920.dp).height(640.dp),
             shape = MaterialTheme.shapes.medium,
             color = MaterialTheme.colorScheme.surface,
             tonalElevation = 8.dp
@@ -264,6 +273,29 @@ fun FilePickerDialog(
                             onCheckedChange = { checked -> searchScope = if (checked) SearchScope.SYSTEM else SearchScope.FOLDER }
                         )
                     }
+                    Spacer(Modifier.width(12.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(
+                            onClick = { FilePickerPreferences.selectViewMode(FilePickerViewMode.LIST) },
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.ViewList,
+                                contentDescription = "Vista de lista",
+                                tint = if (FilePickerPreferences.viewMode == FilePickerViewMode.LIST) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
+                            )
+                        }
+                        IconButton(
+                            onClick = { FilePickerPreferences.selectViewMode(FilePickerViewMode.GRID) },
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.GridView,
+                                contentDescription = "Vista de cuadrícula",
+                                tint = if (FilePickerPreferences.viewMode == FilePickerViewMode.GRID) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
+                            )
+                        }
+                    }
                 }
 
                 Spacer(Modifier.height(12.dp))
@@ -332,16 +364,12 @@ fun FilePickerDialog(
                                 systemSearchResults.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                                     Text("SIN RESULTADOS", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.secondary)
                                 }
-                                else -> LazyColumn(modifier = Modifier.fillMaxSize()) {
-                                    items(systemSearchResults, key = { it.absolutePath }) { file ->
-                                        FileEntryRow(
-                                            file = file,
-                                            isSelected = selected.contains(file),
-                                            subtitle = file.parentFile?.absolutePath,
-                                            onClick = { onEntryClick(file) }
-                                        )
-                                    }
-                                }
+                                else -> FileResultsView(
+                                    files = systemSearchResults,
+                                    selected = selected,
+                                    showSubtitle = true,
+                                    onClick = ::onEntryClick
+                                )
                             }
                         } else {
                             when {
@@ -355,15 +383,12 @@ fun FilePickerDialog(
                                         color = MaterialTheme.colorScheme.secondary
                                     )
                                 }
-                                else -> LazyColumn(modifier = Modifier.fillMaxSize()) {
-                                    items(filteredFolderEntries, key = { it.absolutePath }) { file ->
-                                        FileEntryRow(
-                                            file = file,
-                                            isSelected = selected.contains(file),
-                                            onClick = { onEntryClick(file) }
-                                        )
-                                    }
-                                }
+                                else -> FileResultsView(
+                                    files = filteredFolderEntries,
+                                    selected = selected,
+                                    showSubtitle = false,
+                                    onClick = ::onEntryClick
+                                )
                             }
                         }
                     }
@@ -403,6 +428,80 @@ fun FilePickerDialog(
                 }
             }
         }
+    }
+}
+
+/** Lista o cuadrícula de resultados, según [FilePickerPreferences.viewMode]. */
+@Composable
+private fun FileResultsView(
+    files: List<File>,
+    selected: List<File>,
+    showSubtitle: Boolean,
+    onClick: (File) -> Unit
+) {
+    if (FilePickerPreferences.viewMode == FilePickerViewMode.GRID) {
+        LazyVerticalGrid(
+            columns = GridCells.Adaptive(minSize = 120.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.fillMaxSize()
+        ) {
+            items(files, key = { it.absolutePath }) { file ->
+                FileGridTile(
+                    file = file,
+                    isSelected = selected.contains(file),
+                    onClick = { onClick(file) }
+                )
+            }
+        }
+    } else {
+        LazyColumn(modifier = Modifier.fillMaxSize()) {
+            items(files, key = { it.absolutePath }) { file ->
+                FileEntryRow(
+                    file = file,
+                    isSelected = selected.contains(file),
+                    subtitle = if (showSubtitle) file.parentFile?.absolutePath else null,
+                    onClick = { onClick(file) }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun FileGridTile(file: File, isSelected: Boolean, onClick: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .border(
+                width = if (isSelected) 2.dp else 1.dp,
+                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                shape = RoundedCornerShape(6.dp)
+            )
+            .padding(6.dp)
+    ) {
+        Box(modifier = Modifier.fillMaxWidth().aspectRatio(1f)) {
+            MediaThumbnail(file, modifier = Modifier.fillMaxSize())
+            if (isSelected) {
+                Icon(
+                    imageVector = Icons.Default.CheckCircle,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(4.dp)
+                        .background(Color.Black.copy(alpha = 0.4f), CircleShape)
+                )
+            }
+        }
+        Spacer(Modifier.height(4.dp))
+        Text(
+            text = file.name,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1
+        )
     }
 }
 

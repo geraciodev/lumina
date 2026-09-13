@@ -32,6 +32,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -47,8 +48,10 @@ import com.geraciodev.lumina.data.model.GalleryImage
 import com.geraciodev.lumina.ui.MainViewModel
 import com.geraciodev.lumina.ui.filepicker.FilePickerDialog
 import com.geraciodev.lumina.ui.filepicker.FilePickerMode
+import com.geraciodev.lumina.util.decodeScaledBitmap
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.File
-import javax.imageio.ImageIO
 
 private val galleryImageExtensions = setOf("jpg", "jpeg", "png", "bmp", "gif", "webp")
 
@@ -152,7 +155,10 @@ private fun GalleryThumbnail(
     onSelect: () -> Unit,
     onDelete: () -> Unit
 ) {
-    val bitmap = remember(image.filePath) { loadThumbnail(image.filePath) }
+    var bitmap by remember(image.filePath) { mutableStateOf<ImageBitmap?>(null) }
+    LaunchedEffect(image.filePath) {
+        bitmap = loadThumbnail(image.filePath)
+    }
 
     Surface(
         modifier = Modifier
@@ -165,9 +171,10 @@ private fun GalleryThumbnail(
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
-            if (bitmap != null) {
+            val currentBitmap = bitmap
+            if (currentBitmap != null) {
                 Image(
-                    bitmap = bitmap,
+                    bitmap = currentBitmap,
                     contentDescription = image.fileName,
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop
@@ -227,12 +234,6 @@ private fun GalleryThumbnail(
     }
 }
 
-private fun loadThumbnail(path: String): ImageBitmap? {
-    return try {
-        val file = File(path)
-        if (!file.exists()) return null
-        ImageIO.read(file)?.toComposeImageBitmap()
-    } catch (e: Exception) {
-        null
-    }
+private suspend fun loadThumbnail(path: String): ImageBitmap? = withContext(Dispatchers.IO) {
+    decodeScaledBitmap(File(path))?.toComposeImageBitmap()
 }
