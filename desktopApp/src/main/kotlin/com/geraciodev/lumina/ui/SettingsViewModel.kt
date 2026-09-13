@@ -25,6 +25,9 @@ class SettingsViewModel(private val settingsRepository: SettingsRepository) {
     var projectionFontColor by mutableStateOf(0xFFFFFFFFL)
     var projectionBackgroundImage by mutableStateOf<String?>(null)
         private set
+    var projectionBackgroundOpacity by mutableStateOf(0.55f)
+    var projectionScreenIndex by mutableStateOf<Int?>(null)
+        private set
 
     // Enumerar las fuentes del sistema es costoso; se difiere hasta que la pantalla de Ajustes
     // la pida realmente, en lugar de pagar ese costo en cada arranque de la app.
@@ -44,12 +47,20 @@ class SettingsViewModel(private val settingsRepository: SettingsRepository) {
         projectionFontFamily = settings.projectionFontFamily
         projectionFontColor = settings.projectionFontColor
         projectionBackgroundImage = settings.projectionBackgroundImage
+        projectionBackgroundOpacity = settings.projectionBackgroundOpacity
+        projectionScreenIndex = settings.projectionScreenIndex
         VideoManager.updateVolume(settings.volume)
     }
 
     /** Selecciona (o quita, con `null`) la imagen de fondo para la proyección bíblica. */
     fun selectProjectionBackgroundImage(path: String?) {
         projectionBackgroundImage = path
+        saveCurrentSettings()
+    }
+
+    /** Elige qué pantalla física usar para la ventana de proyección (`null` = automático). */
+    fun selectProjectionScreen(index: Int?) {
+        projectionScreenIndex = index
         saveCurrentSettings()
     }
 
@@ -91,7 +102,9 @@ class SettingsViewModel(private val settingsRepository: SettingsRepository) {
                 projectionFontSize = projectionFontSize,
                 projectionFontFamily = projectionFontFamily,
                 projectionFontColor = projectionFontColor,
-                projectionBackgroundImage = projectionBackgroundImage
+                projectionBackgroundImage = projectionBackgroundImage,
+                projectionBackgroundOpacity = projectionBackgroundOpacity,
+                projectionScreenIndex = projectionScreenIndex
             )
         )
     }

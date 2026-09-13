@@ -14,7 +14,9 @@ data class AppSettings(
     val projectionFontSize: Int = 48,
     val projectionFontFamily: String = "Inter",
     val projectionFontColor: Long = 0xFFFFFFFFL, // White
-    val projectionBackgroundImage: String? = null
+    val projectionBackgroundImage: String? = null,
+    val projectionBackgroundOpacity: Float = 0.55f,
+    val projectionScreenIndex: Int? = null
 )
 
 @Serializable

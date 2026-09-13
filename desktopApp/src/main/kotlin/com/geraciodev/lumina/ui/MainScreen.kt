@@ -331,6 +331,12 @@ fun SearchAndPlayerView(viewModel: MainViewModel) {
             modifier = Modifier
                 .weight(0.65f)
                 .fillMaxHeight()
+                .pointerInput(Unit) {
+                    detectTapGestures {
+                        focusManager.clearFocus()
+                        viewModel.isAnyInputFocused = false
+                    }
+                }
                 .padding(start = 12.dp, top = 24.dp, end = 24.dp, bottom = 24.dp)
         ) {
             if (viewModel.player.selectedVideo != null) {
@@ -478,6 +484,7 @@ fun SearchAndPlayerView(viewModel: MainViewModel) {
 
 @Composable
 fun PlaylistOverlay(viewModel: MainViewModel) {
+    val focusManager = LocalFocusManager.current
     val items =
         if (viewModel.player.showRecentInOverlay) viewModel.player.recentFiles else viewModel.player.playingPlaylist?.items
             ?: emptyList()
@@ -521,6 +528,8 @@ fun PlaylistOverlay(viewModel: MainViewModel) {
                             )
                         },
                         modifier = Modifier.clickable {
+                            focusManager.clearFocus()
+                            viewModel.isAnyInputFocused = false
                             val file = File(item.filePath)
                             if (file.exists()) {
                                 // Si estamos en modo recientes, mantenemos el modo recientes al seleccionar

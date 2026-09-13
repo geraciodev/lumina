@@ -2,7 +2,6 @@ package com.geraciodev.lumina.ui
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
@@ -21,7 +20,6 @@ import androidx.compose.ui.input.pointer.onPointerEvent
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -66,7 +64,7 @@ fun VideoPlayer(
     }
 }
 
-@OptIn(ExperimentalComposeUiApi::class, ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun VideoControls(playerViewModel: PlayerViewModel, modifier: Modifier = Modifier) {
     val isPlaying = VideoManager.isPlaying
@@ -134,27 +132,14 @@ fun VideoControls(playerViewModel: PlayerViewModel, modifier: Modifier = Modifie
                     }
                 }
 
-                val seekBarColors = SliderDefaults.colors(
-                    thumbColor = MaterialTheme.colorScheme.primary,
-                    activeTrackColor = MaterialTheme.colorScheme.primary
-                )
-                val seekBarInteractionSource = remember { MutableInteractionSource() }
-                Slider(
+                RoundThumbSlider(
                     value = position,
                     onValueChange = { VideoManager.seekTo(it) },
                     modifier = Modifier.fillMaxWidth().height(20.dp),
-                    colors = seekBarColors,
-                    interactionSource = seekBarInteractionSource,
-                    // Mismo thumb circular y compacto que el control de volumen, en vez del
-                    // pill fino y alargado por defecto de Material3.
-                    thumb = { sliderState ->
-                        SliderDefaults.Thumb(
-                            interactionSource = seekBarInteractionSource,
-                            sliderState = sliderState,
-                            colors = seekBarColors,
-                            thumbSize = DpSize(18.dp, 18.dp)
-                        )
-                    }
+                    colors = SliderDefaults.colors(
+                        thumbColor = MaterialTheme.colorScheme.primary,
+                        activeTrackColor = MaterialTheme.colorScheme.primary
+                    )
                 )
             }
 
@@ -323,22 +308,10 @@ fun VideoControls(playerViewModel: PlayerViewModel, modifier: Modifier = Modifie
                                 tint = if (isMuted) MaterialTheme.colorScheme.error else Color.White
                             )
                         }
-                        val volumeThumbInteractionSource = remember { MutableInteractionSource() }
-                        Slider(
+                        RoundThumbSlider(
                             value = VideoManager.currentVolume.toFloat(),
                             onValueChange = { VideoManager.updateVolume(it.toInt()) },
                             valueRange = 0f..100f,
-                            interactionSource = volumeThumbInteractionSource,
-                            // El thumb "pill" por defecto de Material3 es muy fino y alargado
-                            // para agarrarlo con el mouse; lo cambiamos por uno circular y más
-                            // grande, más cómodo de manipular.
-                            thumb = { sliderState ->
-                                SliderDefaults.Thumb(
-                                    interactionSource = volumeThumbInteractionSource,
-                                    sliderState = sliderState,
-                                    thumbSize = DpSize(18.dp, 18.dp)
-                                )
-                            },
                             modifier = Modifier
                                 .width(140.dp)
                                 .onPointerEvent(PointerEventType.Scroll) { event ->

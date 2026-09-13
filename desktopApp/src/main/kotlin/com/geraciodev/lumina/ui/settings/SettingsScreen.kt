@@ -1,6 +1,7 @@
 package com.geraciodev.lumina.ui.settings
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -20,11 +21,13 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Keyboard
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -35,7 +38,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -51,8 +53,10 @@ import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.PopupProperties
 import com.geraciodev.lumina.ui.MainViewModel
+import com.geraciodev.lumina.ui.RoundThumbSlider
 import com.geraciodev.lumina.ui.filepicker.FilePickerDialog
 import com.geraciodev.lumina.ui.filepicker.FilePickerMode
+import com.geraciodev.lumina.util.detectScreens
 import java.awt.event.KeyEvent
 import java.io.File
 
@@ -153,25 +157,97 @@ fun SettingsScreen(viewModel: MainViewModel) {
 
             item {
                 SettingsSection(title = "PROYECCIÓN") {
+                    var screens by remember { mutableStateOf(detectScreens()) }
+                    val selectedIndex = viewModel.settings.projectionScreenIndex
+                    val autoIndex = if (screens.size > 1) 1 else 0
+
                     SettingsItem(
                         title = "Monitor de salida",
-                        description = "Seleccionar en qué pantalla se mostrará la proyección.",
+                        description = "Elegir en qué pantalla física se muestra la proyección.",
                         action = {
-                            Text("Monitor Secundario (Detectado)", style = MaterialTheme.typography.bodySmall)
+                            IconButton(onClick = { screens = detectScreens() }) {
+                                Icon(Icons.Default.Refresh, contentDescription = "Detectar pantallas de nuevo")
+                            }
                         }
                     )
-                    
+
+                    Spacer(Modifier.height(8.dp))
+
+                    screens.forEach { screen ->
+                        val isSelected = selectedIndex == screen.index ||
+                            (selectedIndex == null && screen.index == autoIndex)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { viewModel.settings.selectProjectionScreen(screen.index) }
+                                .background(if (isSelected) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent)
+                                .padding(horizontal = 8.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text(
+                                    text = buildString {
+                                        append("Pantalla ${screen.index + 1}")
+                                        if (screen.isPrimary) append(" (Principal)")
+                                        if (selectedIndex == null && screen.index == autoIndex) append(" · Automático")
+                                    },
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = "${screen.bounds.width}×${screen.bounds.height}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.secondary
+                                )
+                            }
+                            if (isSelected) {
+                                Icon(
+                                    Icons.Default.CheckCircle,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    if (screens.size <= 1) {
+                        Text(
+                            text = "Solo se detectó una pantalla. Conecta un monitor o proyector y presiona el botón de recargar para usar la proyección en una pantalla separada.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.7f),
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+                    }
+
                     Spacer(Modifier.height(16.dp))
 
                     SettingsItem(
                         title = "Tamaño de fuente",
                         description = "Ajustar el tamaño del texto en la proyección (${viewModel.settings.projectionFontSize}sp).",
                         action = {
-                            Slider(
+                            RoundThumbSlider(
                                 value = viewModel.settings.projectionFontSize.toFloat(),
                                 onValueChange = { viewModel.settings.projectionFontSize = it.toInt() },
                                 onValueChangeFinished = { viewModel.settings.saveCurrentSettings() },
                                 valueRange = 20f..120f,
+                                modifier = Modifier.width(150.dp)
+                            )
+                        }
+                    )
+
+                    Spacer(Modifier.height(16.dp))
+
+                    SettingsItem(
+                        title = "Opacidad del fondo",
+                        description = "Qué tan visible es la imagen de fondo detrás del texto (${(viewModel.settings.projectionBackgroundOpacity * 100).toInt()}%).",
+                        action = {
+                            RoundThumbSlider(
+                                value = viewModel.settings.projectionBackgroundOpacity,
+                                onValueChange = { viewModel.settings.projectionBackgroundOpacity = it },
+                                onValueChangeFinished = { viewModel.settings.saveCurrentSettings() },
+                                valueRange = 0f..1f,
                                 modifier = Modifier.width(150.dp)
                             )
                         }

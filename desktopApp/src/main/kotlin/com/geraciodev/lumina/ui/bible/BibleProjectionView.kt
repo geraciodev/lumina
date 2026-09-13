@@ -41,7 +41,8 @@ fun BibleProjectionView(
     fontSize: Int = 48,
     fontFamily: String = "Inter",
     fontColor: Long = 0xFFFFFFFFL,
-    backgroundImagePath: String? = null
+    backgroundImagePath: String? = null,
+    backgroundOpacity: Float = 0.55f
 ) {
     val backgroundBitmap = remember(backgroundImagePath) {
         loadBackgroundBitmap(backgroundImagePath)
@@ -73,18 +74,7 @@ fun BibleProjectionView(
         contentAlignment = Alignment.Center
     ) {
         if (backgroundBitmap != null) {
-            Image(
-                bitmap = backgroundBitmap,
-                contentDescription = null,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop
-            )
-            // Velo oscuro para que el texto siga siendo legible sobre cualquier imagen.
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.45f))
-            )
+            BackgroundImageLayer(bitmap = backgroundBitmap, opacity = backgroundOpacity)
         }
 
         Column(
@@ -142,6 +132,27 @@ fun BibleProjectionView(
             }
         }
     }
+}
+
+/**
+ * Imagen de fondo de la proyección más la capa que controla su opacidad: [opacity] en 1 deja la
+ * imagen totalmente visible; en 0 la oculta por completo (fondo negro liso). Valores intermedios
+ * la atenúan hacia negro para que el texto proyectado encima siga siendo legible sin importar
+ * qué tan clara o recargada sea la imagen elegida.
+ */
+@Composable
+private fun BackgroundImageLayer(bitmap: ImageBitmap, opacity: Float) {
+    Image(
+        bitmap = bitmap,
+        contentDescription = null,
+        modifier = Modifier.fillMaxSize(),
+        contentScale = ContentScale.Crop
+    )
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = (1f - opacity).coerceIn(0f, 1f)))
+    )
 }
 
 private fun loadBackgroundBitmap(path: String?): ImageBitmap? {

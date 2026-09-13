@@ -20,7 +20,7 @@ import com.geraciodev.lumina.ui.VideoPlayer
 import com.geraciodev.lumina.ui.WindowTitleBar
 import com.geraciodev.lumina.ui.theme.LuminaTheme
 import com.geraciodev.lumina.ui.bible.BibleProjectionView
-import java.awt.GraphicsEnvironment
+import com.geraciodev.lumina.util.resolveProjectionScreen
 
 fun main() = application {
     val scope = rememberCoroutineScope()
@@ -60,16 +60,23 @@ fun main() = application {
             if (keyEvent.type == KeyEventType.KeyDown) {
                 val recordingName = viewModel.settings.recordingShortcutName
                 if (recordingName != null) {
-                    viewModel.settings.updateShortcut(
-                        recordingName,
-                        ShortcutConfig(
-                            keyCode = keyEvent.key.nativeKeyCode,
-                            ctrl = keyEvent.isCtrlPressed,
-                            alt = keyEvent.isAltPressed,
-                            shift = keyEvent.isShiftPressed
+                    val code = keyEvent.key.nativeKeyCode
+                    // Al grabar un atajo con modificador (p. ej. Ctrl+B), Ctrl dispara su propio
+                    // KeyDown antes que "B". Si grabáramos ese primer evento tal cual, el atajo
+                    // quedaría asociado a "solo Ctrl" en vez de "Ctrl+B". Esperamos a que la
+                    // tecla presionada no sea, en sí misma, un modificador.
+                    if (code !in modifierOnlyKeyCodes) {
+                        viewModel.settings.updateShortcut(
+                            recordingName,
+                            ShortcutConfig(
+                                keyCode = code,
+                                ctrl = keyEvent.isCtrlPressed,
+                                alt = keyEvent.isAltPressed,
+                                shift = keyEvent.isShiftPressed
+                            )
                         )
-                    )
-                    viewModel.settings.recordingShortcutName = null
+                        viewModel.settings.recordingShortcutName = null
+                    }
                     true
                 } else if (viewModel.isAnyInputFocused) {
                     false
@@ -118,8 +125,7 @@ fun main() = application {
     val projectingBibleVerses = viewModel.bible.projectingBibleVerses
     
     if (projectingFile != null || projectingBibleVerses != null) {
-        val screens = GraphicsEnvironment.getLocalGraphicsEnvironment().screenDevices
-        val secondScreen = if (screens.size > 1) screens[1] else null
+        val secondScreen = resolveProjectionScreen(viewModel.settings.projectionScreenIndex)
         val bounds = secondScreen?.defaultConfiguration?.bounds
 
         val windowState = rememberWindowState(
@@ -153,7 +159,8 @@ fun main() = application {
                     fontSize = viewModel.settings.projectionFontSize,
                     fontFamily = viewModel.settings.projectionFontFamily,
                     fontColor = viewModel.settings.projectionFontColor,
-                    backgroundImagePath = viewModel.settings.projectionBackgroundImage
+                    backgroundImagePath = viewModel.settings.projectionBackgroundImage,
+                    backgroundOpacity = viewModel.settings.projectionBackgroundOpacity
                 )
             }
         }
@@ -161,3 +168,7 @@ fun main() = application {
 }
 
 private val Int.dp: Dp get() = Dp(this.toFloat())
+
+// Códigos AWT VK_SHIFT, VK_CONTROL, VK_ALT, VK_META y VK_ALT_GRAPH: teclas que son en sí mismas
+// modificadores, para no grabarlas como el atajo en sí al capturar un atajo con combinación.
+private val modifierOnlyKeyCodes = setOf(16, 17, 18, 157, 65406)
